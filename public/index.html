@@ -310,16 +310,17 @@
                 } else {
                     const errorText = await response.text();
                     console.error("Server returned non-JSON:", errorText);
-                    // Extract error from Vercel's HTML error page if possible
                     if (errorText.includes("FUNCTION_INVOCATION_FAILED")) {
-                        result = { error: "Server-Funktion abgestürzt. Bitte warte 1 Min und versuche es erneut." };
+                        result = { error: "Server-Funktion abgestürzt. Vercel Env Vars prüfen!" };
+                    } else if (errorText.includes("500")) {
+                        result = { error: "Server Error 500. Supabase Verbindung prüfen." };
                     } else {
-                        result = { error: "Server-Fehler (Status " + response.status + ")" };
+                        result = { error: "Unbekannter Server-Fehler: " + errorText.substring(0, 50) };
                     }
                 }
                 
                 if (!response.ok) {
-                    throw new Error(result.error || "Senden fehlgeschlagen");
+                    throw new Error(result.error || result.details || "Senden fehlgeschlagen");
                 }
                 
                 await refreshChat();
