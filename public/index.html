@@ -113,6 +113,12 @@
     </div>
 
     <div class="chat-container">
+        <!-- Error Banner (Hidden by default) -->
+        <div id="error-banner" style="background-color: #f23f43; color: white; padding: 16px; text-align: center; display: none; font-weight: bold;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span id="error-text">Verbindungsfehler</span>
+        </div>
+
         <div class="chat-header">
             <i class="fa-solid fa-hashtag"></i>
             <h2 id="current-channel-name">andere</h2>
@@ -190,10 +196,19 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/list`);
                 if (!res.ok) {
-                    const errorText = await res.text();
-                    console.error("List fetch error:", errorText);
+                    const json = await res.json().catch(() => ({}));
+                    if (json.missing_vars) {
+                        document.getElementById('error-banner').style.display = 'block';
+                        document.getElementById('error-text').innerHTML = `SETUP ERFORDERLICH: <a href="https://vercel.com/docs/projects/environment-variables" target="_blank" style="color:white;text-decoration:underline;">Supabase Environment Variables</a> fehlen in Vercel.`;
+                        return;
+                    }
+                    console.error("List fetch error");
                     return;
                 }
+                
+                // Hide banner if successful
+                document.getElementById('error-banner').style.display = 'none';
+                
                 const data = await res.json();
                 
                 // Filter messages for current channel
@@ -205,7 +220,6 @@
                 renderMessages(filtered);
             } catch (err) {
                 console.error("Fetch error:", err);
-                chatFeed.innerHTML = `<div style="color: #f23f43; padding: 20px;">Fehler beim Laden der Nachrichten. Prüfe die Konsole.</div>`;
             }
         }
 

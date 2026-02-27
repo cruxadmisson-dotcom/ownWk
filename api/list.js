@@ -1,14 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// --- Helper: Safe Supabase Client ---
-const getSupabase = () => {
-    const url = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-    const key = process.env.SUPABASE_ANON_KEY || 'placeholder';
-    return createClient(url, key);
-};
-
 module.exports = async (req, res) => {
-    // Enable CORS
+    // CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -17,7 +10,15 @@ module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        const supabase = getSupabase();
+        // Env Check
+        const SUPABASE_URL = process.env.SUPABASE_URL;
+        const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+            return res.status(503).json({ error: "Setup Required", missing_vars: true });
+        }
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         const { data, error } = await supabase
             .from('events')
@@ -25,20 +26,12 @@ module.exports = async (req, res) => {
             .order('timestamp', { ascending: true });
 
         if (error) {
-            // Check if it's a URL/Key error
-            if (error.message && error.message.includes("supabaseUrl")) {
-                console.error("Supabase Config Error:", error);
-                return res.status(500).json({ error: "Server Configuration Error: Check Env Vars" });
-            }
-            console.error('Supabase error:', error);
-            return res.status(500).json({ error: error.message });
+            console.error("List DB Error:", error);
+            return res.status(500).json({ error: "DB Error: " + error.message });
         }
 
-        if (!data) {
-            return res.status(200).json([]);
-        }
+        if (!data) return res.status(200).json([]);
 
-        // Map events to the structure expected by the frontend
         const mappedData = data.map(item => ({
             type: item.type,
             timestamp: item.timestamp,
@@ -50,8 +43,9 @@ module.exports = async (req, res) => {
         }));
 
         res.status(200).json(mappedData);
-    } catch (error) {
-        console.error('List API Error:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+
+    } catch (e) {
+        console.error("Critical List Error:", e);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 };
