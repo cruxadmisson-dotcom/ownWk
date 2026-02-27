@@ -6,7 +6,8 @@ const supabase = createClient(
 );
 
 // Configuration to disable Vercel's automatic body parsing
-export const config = {
+// This must be at the top level
+module.exports.config = {
     api: {
         bodyParser: false,
     },
@@ -26,7 +27,7 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-File-Name');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-File-Name, X-Channel-Id');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -40,12 +41,13 @@ module.exports = async (req, res) => {
     const timestamp = new Date().toISOString();
     const contentType = req.headers['content-type'] || '';
     const fileName = req.headers['x-file-name'] || `file_${Date.now()}`;
+    const channelId = req.headers['x-channel-id'] || 'general';
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
         const buffer = await getRawBody(req);
         
-        // --- CASE 1: FILE UPLOAD (Octet-stream or x-file-name header) ---
+        // --- CASE 1: FILE UPLOAD ---
         if (contentType.includes('application/octet-stream') || req.headers['x-file-name']) {
             const safeFileName = `${Date.now()}_${fileName}`;
             
@@ -63,6 +65,7 @@ module.exports = async (req, res) => {
                 name: fileName,
                 size: buffer.length,
                 path: publicUrl,
+                content: channelId, // Reuse content column for channelId
                 headers: JSON.stringify({ ...req.headers, ip: ip })
             }]);
 
@@ -72,22 +75,13 @@ module.exports = async (req, res) => {
         // --- CASE 2: WEBHOOK OR CHAT MESSAGE ---
         let content = buffer.toString();
         
-        // Try to parse as JSON
-        try {
-            const json = JSON.parse(content);
-            content = JSON.stringify(json, null, 2);
-        } catch (e) {
-            // content remains a string
-        }
-
-        const { error: dbError } = await supabase.from('events').insert([{
+        await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
             content: content,
+            name: channelId, // Reuse name column for channelId
             headers: JSON.stringify({ ...req.headers, ip: ip })
         }]);
-
-        if (dbError) throw dbError;
 
         res.status(200).send('Data received and saved');
 

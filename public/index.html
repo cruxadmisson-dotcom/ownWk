@@ -144,7 +144,7 @@
     <div class="chat-container">
         <div class="chat-header">
             <i class="fa-solid fa-hashtag"></i>
-            <h2>andere</h2>
+            <h2 id="current-channel-name">andere</h2>
         </div>
         
         <div class="chat-messages" id="chat-feed">
@@ -175,15 +175,27 @@
         </div>
     </div>
 
+    <!-- Context Menu -->
+    <div id="context-menu" style="position: fixed; background: #111214; padding: 8px; border-radius: 4px; display: none; z-index: 1000; width: 180px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);">
+        <div class="menu-item" id="delete-channel-opt" style="color: #f23f43;">
+            <i class="fa-solid fa-trash-can"></i> Kanal löschen
+        </div>
+    </div>
+
     <script>
         const API_BASE_URL = window.location.origin + '/api';
         const chatFeed = document.getElementById('chat-feed');
         const chatInput = document.getElementById('chat-input');
+        
+        let currentChannelId = 'general';
+        let currentChannelName = 'andere';
+        let channels = [];
 
         // Initial Load
-        window.onload = () => {
+        window.onload = async () => {
+            await loadChannels();
             refreshChat();
-            setInterval(refreshChat, 4000);
+            setInterval(refreshChat, 3000);
 
             // Setup Enter Key
             chatInput.addEventListener('keydown', (e) => {
@@ -219,15 +231,84 @@
             document.onclick = () => {
                 uploadMenu.style.display = 'none';
                 emojiPicker.style.display = 'none';
+                document.getElementById('context-menu').style.display = 'none';
             };
         };
+
+        async function loadChannels() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/channels`);
+                if (res.ok) {
+                    channels = await res.json();
+                    renderChannelList();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        function renderChannelList() {
+            const list = document.querySelector('.channel-list');
+            list.innerHTML = `<div class="channel-category">Textkanäle <i class="fa-solid fa-plus" onclick="createNewChannel()" style="cursor:pointer;"></i></div>`;
+            
+            channels.forEach(ch => {
+                const item = document.createElement('div');
+                item.className = `channel-item ${currentChannelId === ch.id ? 'active' : ''}`;
+                item.innerHTML = `<i class="fa-solid fa-hashtag"></i> ${ch.name}`;
+                item.onclick = () => switchChannel(ch.id, ch.name);
+                item.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    showContextMenu(e, ch.id);
+                };
+                list.appendChild(item);
+            });
+        }
+
+        function showContextMenu(e, id) {
+            const menu = document.getElementById('context-menu');
+            menu.style.top = `${e.clientY}px`;
+            menu.style.left = `${e.clientX}px`;
+            menu.style.display = 'block';
+            document.getElementById('delete-channel-opt').onclick = () => deleteChannel(id);
+        }
+
+        async function createNewChannel() {
+            const name = prompt("Kanalname eingeben:");
+            if (!name) return;
+            await fetch(`${API_BASE_URL}/channels`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            await loadChannels();
+        }
+
+        async function deleteChannel(id) {
+            if (!confirm("Kanal wirklich löschen?")) return;
+            await fetch(`${API_BASE_URL}/channels?id=${id}`, { method: 'DELETE' });
+            await loadChannels();
+        }
+
+        function switchChannel(id, name) {
+            currentChannelId = id;
+            currentChannelName = name;
+            document.getElementById('current-channel-name').innerText = name;
+            document.getElementById('chat-input').placeholder = `Nachricht an #${name}`;
+            renderChannelList();
+            refreshChat();
+        }
 
         async function refreshChat() {
             try {
                 const res = await fetch(`${API_BASE_URL}/list`);
                 if (!res.ok) return;
                 const data = await res.json();
-                renderMessages(data);
+                
+                // Filter messages for current channel
+                const filtered = data.filter(item => {
+                    if (item.type === 'upload') return item.content === currentChannelId || (currentChannelId === 'general' && !item.content);
+                    return item.name === currentChannelId || (currentChannelId === 'general' && !item.name);
+                });
+                
+                renderMessages(filtered);
             } catch (err) {
                 console.error("Fetch error:", err);
             }
@@ -237,9 +318,8 @@
             let html = `
                 <div class="welcome-section">
                     <div class="welcome-hash">#</div>
-                    <h1 class="welcome-title">Willkommen bei #andere!</h1>
-                    <p class="welcome-subtitle">Das ist der Beginn des Kanals #andere.</p>
-                    <button class="edit-channel-btn"><i class="fa-solid fa-pencil" style="font-size: 12px; margin-right: 6px;"></i> Kanal bearbeiten</button>
+                    <h1 class="welcome-title">Willkommen bei #${currentChannelName}!</h1>
+                    <p class="welcome-subtitle">Das ist der Beginn des Kanals #${currentChannelName}.</p>
                 </div>
             `;
 
@@ -255,7 +335,6 @@
                 let content = item.content;
                 let avatarColor = '#23a559';
                 let avatarInitial = 'W';
-                let isMedia = false;
 
                 if (item.type === 'upload') {
                     author = 'File Bot';
@@ -302,7 +381,7 @@
                 `;
             });
 
-            const shouldScroll = chatFeed.scrollTop + chatFeed.clientHeight >= chatFeed.scrollHeight - 50;
+            const shouldScroll = chatFeed.scrollTop + chatFeed.clientHeight >= chatFeed.scrollHeight - 100;
             chatFeed.innerHTML = html;
             if (shouldScroll) chatFeed.scrollTop = chatFeed.scrollHeight;
         }
@@ -314,7 +393,10 @@
             
             await fetch(`${API_BASE_URL}/webhook`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Channel-Id': currentChannelId
+                },
                 body: JSON.stringify({ type: 'chat_message', content: text, author: 'Admin' })
             });
             refreshChat();
@@ -325,7 +407,10 @@
             const file = input.files[0];
             await fetch(`${API_BASE_URL}/webhook`, {
                 method: 'POST',
-                headers: { 'X-File-Name': file.name },
+                headers: { 
+                    'X-File-Name': file.name,
+                    'X-Channel-Id': currentChannelId
+                },
                 body: file
             });
             refreshChat();
