@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 // --- Environment Variable Check ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -13,22 +13,17 @@ const supabase = createClient(
     SUPABASE_ANON_KEY || 'placeholder'
 );
 
-export const config = {
-    api: {
-        bodyParser: false,
-    },
-};
-
 // Robust buffer reading
 const getRawBody = async (req) => {
-    const chunks = [];
-    for await (const chunk of req) {
-        chunks.push(chunk);
-    }
-    return Buffer.concat(chunks);
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', (chunk) => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', (err) => reject(err));
+    });
 };
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -112,4 +107,11 @@ export default async function handler(req, res) {
         console.error("Critical Error:", error);
         return res.status(500).json({ error: error.message, details: "Check server logs" });
     }
-}
+};
+
+// Export config for Vercel (CommonJS style)
+module.exports.config = {
+    api: {
+        bodyParser: false,
+    },
+};
