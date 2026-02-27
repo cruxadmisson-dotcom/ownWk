@@ -276,14 +276,38 @@
         async function sendChatMessage() {
             const text = chatInput.value.trim();
             if (!text) return;
-            chatInput.value = '';
             
-            await fetch(`${API_BASE_URL}/webhook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Channel-Id': currentChannel },
-                body: JSON.stringify({ type: 'chat_message', content: text, author: 'Admin' })
-            });
-            refreshChat();
+            const originalValue = text;
+            chatInput.value = '';
+            chatInput.placeholder = "Sende...";
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/webhook`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Channel-Id': currentChannel 
+                    },
+                    body: JSON.stringify({ 
+                        type: 'chat_message', 
+                        content: text, 
+                        author: 'Admin' 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error("Senden fehlgeschlagen");
+                }
+                
+                await refreshChat();
+            } catch (err) {
+                console.error("Send error:", err);
+                chatInput.value = originalValue;
+                alert("Fehler beim Senden!");
+            } finally {
+                chatInput.placeholder = `Nachricht an #${currentChannel}`;
+                chatInput.focus();
+            }
         }
 
         async function handleFileUpload(input) {
