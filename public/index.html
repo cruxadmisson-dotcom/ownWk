@@ -1,138 +1,161 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Own Webhook System</title>
+    <title>ownWk | Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h1 { color: #333; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
-        .status { margin-top: 10px; font-weight: bold; }
-        .feed-item {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 10px;
-            border-left: 5px solid #007bff; /* Accent color */
+        :root {
+            --discord-dark: #313338;
+            --discord-darker: #2b2d31;
+            --discord-darkest: #1e1f22;
+            --discord-sidebar: #232428;
+            --discord-text: #dbdee1;
+            --discord-muted: #949ba4;
+            --discord-blue: #5865f2;
+            --discord-green: #23a559;
+            --discord-header: #ffffff;
+            --discord-item-hover: #35373c;
         }
-        .feed-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #eee;
-        }
-        .feed-item-header h3 {
-            margin: 0;
-            color: #333;
-            font-size: 1.1em;
-        }
-        .feed-item-timestamp {
-            font-size: 0.8em;
-            color: #777;
-        }
-        .feed-item-content div {
-            margin-bottom: 5px;
-        }
-        .feed-item-content pre {
-            margin-top: 5px;
-            margin-bottom: 5px;
-        }
-        .file-download-link {
-            display: inline-block;
-            background: #28a745;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
-        .file-download-link:hover {
-            background: #218838;
-        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        body { background-color: var(--discord-darkest); color: var(--discord-text); display: flex; height: 100vh; overflow: hidden; }
+
+        /* Sidebar - Server List */
+        .guilds-sidebar { width: 72px; background-color: var(--discord-darkest); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; border-right: 1px solid rgba(255,255,255,0.05); }
+        .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; position: relative; }
+        .guild-icon:hover { border-radius: 30%; background-color: var(--discord-blue); color: white; }
+        .guild-icon.active { border-radius: 30%; background-color: var(--discord-blue); }
+        .guild-icon i { font-size: 20px; }
+        .guild-separator { width: 32px; height: 2px; background-color: var(--discord-dark); border-radius: 1px; }
+
+        /* Sidebar - Channel List */
+        .channels-sidebar { width: 240px; background-color: var(--discord-sidebar); display: flex; flex-direction: column; }
+        .server-header { height: 48px; padding: 0 16px; display: flex; align-items: center; box-shadow: 0 1px 0 rgba(0,0,0,0.2); font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .server-header:hover { background-color: rgba(255,255,255,0.05); }
+        .channel-list { padding: 8px; flex: 1; overflow-y: auto; }
+        .channel-category { padding: 18px 8px 4px 16px; font-size: 12px; font-weight: bold; color: var(--discord-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; }
+        .channel-item:hover { background-color: rgba(255,255,255,0.05); color: var(--discord-text); }
+        .channel-item.active { background-color: rgba(255,255,255,0.1); color: white; }
+        .channel-item i { font-size: 18px; opacity: 0.6; }
+
+        /* User Info (Bottom of Sidebar) */
+        .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background-color: var(--discord-blue); position: relative; }
+        .user-avatar::after { content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background-color: var(--discord-green); border: 2px solid #232428; }
+        .user-details { flex: 1; min-width: 0; }
+        .username { font-size: 14px; font-weight: bold; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .user-status { font-size: 12px; color: var(--discord-muted); }
+
+        /* Main Chat Area */
+        .chat-container { flex: 1; display: flex; flex-direction: column; background-color: var(--discord-dark); }
+        .chat-header { height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+        .chat-header i { color: var(--discord-muted); font-size: 20px; }
+        .chat-header h2 { font-size: 16px; color: white; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 16px 0; }
+
+        /* Message Styling */
+        .message { padding: 2px 16px; margin-top: 1.0625rem; display: flex; gap: 16px; }
+        .message:hover { background-color: rgba(0,0,0,0.05); }
+        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: var(--discord-blue); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .msg-content { flex: 1; min-width: 0; }
+        .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .msg-author { font-weight: 500; color: white; cursor: pointer; }
+        .msg-author:hover { text-decoration: underline; }
+        .msg-timestamp { font-size: 12px; color: var(--discord-muted); }
+        .msg-text { color: var(--discord-text); line-height: 1.375rem; white-space: pre-wrap; word-break: break-all; }
+        
+        /* Attachment/Embed Styling */
+        .attachment { margin-top: 8px; background-color: var(--discord-darker); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 12px; display: flex; align-items: center; gap: 12px; max-width: 400px; }
+        .file-icon { font-size: 24px; color: var(--discord-muted); }
+        .file-info { flex: 1; min-width: 0; }
+        .file-name { color: var(--discord-blue); font-weight: 500; cursor: pointer; text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; }
+        .file-name:hover { text-decoration: underline; }
+        .file-size { font-size: 12px; color: var(--discord-muted); }
+        .download-btn { color: var(--discord-muted); cursor: pointer; transition: 0.2s; }
+        .download-btn:hover { color: white; }
+
+        /* Webhook Info Card (Top of chat) */
+        .webhook-welcome { padding: 16px; margin: 16px; background-color: var(--discord-darker); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .webhook-welcome h1 { font-size: 24px; color: white; margin-bottom: 8px; }
+        .webhook-welcome p { color: var(--discord-muted); font-size: 14px; margin-bottom: 12px; }
+        .endpoint-box { background: var(--discord-darkest); padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 13px; color: var(--discord-green); display: flex; justify-content: space-between; align-items: center; }
+        .copy-btn { cursor: pointer; color: var(--discord-muted); }
+        .copy-btn:hover { color: white; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--discord-darkest); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #1a1b1e; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Own Webhook Dashboard</h1>
-        <p>This is your local webhook system. You can send data to <code>/webhook</code> via POST.</p>
-        <div class="webhook-info">
-            <strong>Endpoint:</strong> <code id="webhook-endpoint"></code>
+    <!-- Guilds Sidebar -->
+    <div class="guilds-sidebar">
+        <div class="guild-icon active">
+            <i class="fa-solid fa-house"></i>
+        </div>
+        <div class="guild-separator"></div>
+        <div class="guild-icon">
+            <i class="fa-solid fa-plus"></i>
         </div>
     </div>
 
-    <div class="card">
-        <h2>Received Events</h2>
-        <button onclick="loadWebhooks()">Refresh Feed</button>
-        <div id="webhook-list"></div>
+    <!-- Channels Sidebar -->
+    <div class="channels-sidebar">
+        <div class="server-header">
+            ownWk Webhook
+        </div>
+        <div class="channel-list">
+            <div class="channel-category">Text Channels</div>
+            <div class="channel-item active">
+                <i class="fa-solid fa-hashtag"></i>
+                <span>general-feed</span>
+            </div>
+            <div class="channel-item">
+                <i class="fa-solid fa-hashtag"></i>
+                <span>files-only</span>
+            </div>
+        </div>
+        <div class="user-panel">
+            <div class="user-avatar"></div>
+            <div class="user-details">
+                <div class="username">Admin</div>
+                <div class="user-status">Online</div>
+            </div>
+            <i class="fa-solid fa-gear" style="cursor: pointer; opacity: 0.6;"></i>
+        </div>
     </div>
 
-
-
-    <div class="card">
-        <h2>Send File</h2>
-        <p>Select a file to send to your webhook.</p>
-        <input type="file" id="fileInput">
-        <button onclick="sendFile()">Send File</button>
-        <div id="file-status" class="status"></div>
+    <!-- Chat Area -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <i class="fa-solid fa-hashtag"></i>
+            <h2>general-feed</h2>
+        </div>
+        <div class="chat-messages" id="webhook-list">
+            <!-- Messages will be injected here -->
+        </div>
     </div>
 
     <script>
-        // For Vercel, the API endpoints are in the /api directory
         const API_BASE_URL = window.location.origin + '/api'; 
         
-        document.getElementById('webhook-endpoint').textContent = `${window.location.origin}/api/webhook`;
-
-        window.onload = () => {
-            loadWebhooks();
-            setInterval(loadWebhooks, 5000); // Refresh every 5 seconds
-        };
-
-        async function sendFile() {
-            const fileInput = document.getElementById('fileInput');
-            const statusDiv = document.getElementById('file-status');
-            
-            if (fileInput.files.length === 0) {
-                statusDiv.textContent = 'Please select a file first.';
-                statusDiv.style.color = 'orange';
-                return;
-            }
-
-            const file = fileInput.files[0];
-            statusDiv.textContent = 'Uploading ' + file.name + '...';
-            statusDiv.style.color = 'blue';
-
+        async function copyToClipboard(text) {
             try {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const response = await fetch(`${API_BASE_URL}/webhook`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const text = await response.text();
-                statusDiv.textContent = 'Success: ' + text;
-                statusDiv.style.color = 'green';
-                loadWebhooks();
-            } catch (error) {
-                statusDiv.textContent = 'Error: ' + error.message;
-                statusDiv.style.color = 'red';
+                await navigator.clipboard.writeText(text);
+                alert('Copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy: ', err);
             }
         }
 
         async function loadWebhooks() {
             const listDiv = document.getElementById('webhook-list');
-            listDiv.innerHTML = '<p>Loading...</p>';
-
+            
             try {
                 const response = await fetch(`${API_BASE_URL}/list`);
                 const data = await response.json();
@@ -158,59 +181,82 @@
                     })));
                 }
 
-                combinedFeed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                combinedFeed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-                if (combinedFeed.length === 0) {
-                    listDiv.innerHTML = '<p>No webhooks or files received yet.</p>';
-                    return;
-                }
+                // Clear and render
+                listDiv.innerHTML = `
+                    <div class="webhook-welcome">
+                        <h1>Welcome to #general-feed</h1>
+                        <p>This is the start of your private webhook channel. Files and messages will appear here as they are received.</p>
+                        <div class="endpoint-box">
+                            <span id="webhook-url">${window.location.origin}/api/webhook</span>
+                            <i class="fa-solid fa-copy copy-btn" onclick="copyToClipboard('${window.location.origin}/api/webhook')"></i>
+                        </div>
+                    </div>
+                `;
 
-                listDiv.innerHTML = '';
                 combinedFeed.forEach(item => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'feed-item';
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message';
 
+                    const timestamp = new Date(item.timestamp);
+                    const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const dateString = timestamp.toLocaleDateString();
+                    
                     let contentHtml = '';
-                    let title = '';
-                    let timestamp = item.timestamp;
+                    let author = 'Webhook';
+                    let avatarInitial = 'W';
+                    let avatarColor = '#5865f2';
 
                     if (item.type === 'webhook') {
-                        title = 'Webhook Received';
-                        contentHtml = `
-                            <div class="feed-item-content">
-                                <div><strong>Method:</strong> ${item.headers.method || 'POST'}</div>
-                                <div><strong>Content-Type:</strong> ${item.headers['Content-Type'] || 'N/A'}</div>
-                                <div><strong>Body:</strong> <pre>${item.content}</pre></div>
-                                <div><strong>Headers:</strong> <pre>${JSON.stringify(item.headers, null, 2)}</pre></div>
-                            </div>
-                        `;
+                        avatarInitial = 'M';
+                        author = 'Message Bot';
+                        avatarColor = '#23a559';
+                        contentHtml = `<div class="msg-text">${item.content || '*(Empty body)*'}</div>`;
                     } else if (item.type === 'upload') {
-                        title = 'File Uploaded';
+                        avatarInitial = 'F';
+                        author = 'File Bot';
+                        avatarColor = '#f57731';
                         contentHtml = `
-                            <div class="feed-item-content">
-                                <div><strong>File Name:</strong> ${item.name}</div>
-                                <div><strong>Size:</strong> ${(item.size / 1024).toFixed(2)} KB</div>
-                                <div><a href="${item.path}" target="_blank" class="file-download-link">Download File</a></div>
+                            <div class="msg-text">Sent an attachment:</div>
+                            <div class="attachment">
+                                <i class="fa-solid fa-file file-icon"></i>
+                                <div class="file-info">
+                                    <a href="${item.path}" target="_blank" class="file-name">${item.name}</a>
+                                    <div class="file-size">${(item.size / 1024).toFixed(2)} KB</div>
+                                </div>
+                                <a href="${item.path}" download="${item.name}" class="download-btn">
+                                    <i class="fa-solid fa-download"></i>
+                                </a>
                             </div>
                         `;
                     }
 
-                    itemDiv.innerHTML = `
-                        <div class="feed-item-header">
-                            <h3>${title}</h3>
-                            <span class="feed-item-timestamp">${new Date(timestamp).toLocaleString()}</span>
+                    messageDiv.innerHTML = `
+                        <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
+                        <div class="msg-content">
+                            <div class="msg-header">
+                                <span class="msg-author">${author}</span>
+                                <span class="msg-timestamp">Today at ${timeString}</span>
+                            </div>
+                            ${contentHtml}
                         </div>
-                        ${contentHtml}
                     `;
-                    listDiv.appendChild(itemDiv);
+                    listDiv.appendChild(messageDiv);
                 });
 
+                // Auto-scroll to bottom
+                listDiv.scrollTop = listDiv.scrollHeight;
+
             } catch (error) {
-                listDiv.innerHTML = '<p style="color:red">Error loading data: ' + error.message + '</p>';
+                console.error('Error loading data:', error);
             }
         }
 
-
+        window.onload = () => {
+            loadWebhooks();
+            setInterval(loadWebhooks, 5000); // Live refresh
+        };
     </script>
 </body>
 </html>
