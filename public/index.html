@@ -473,8 +473,8 @@
             const message = input.value.trim();
             if (!message) return;
 
-            input.value = '';
-            input.disabled = true;
+            const originalValue = input.value;
+            input.value = ''; // Sofort leeren für besseres UI-Gefühl
 
             try {
                 const response = await fetch(`${API_BASE_URL}/webhook`, {
@@ -490,16 +490,16 @@
                 });
 
                 if (response.ok) {
-                    loadWebhooks();
+                    await loadWebhooks(); // Sofort neu laden
                 } else {
+                    input.value = originalValue; // Bei Fehler zurücksetzen
                     console.error('Failed to send message');
                 }
             } catch (error) {
+                input.value = originalValue;
                 console.error('Error sending message:', error);
-            } finally {
-                input.disabled = false;
-                input.focus();
             }
+            input.focus();
         }
     </script>
 </body>
