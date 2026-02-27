@@ -295,15 +295,17 @@
                     })
                 });
                 
+                const result = await response.json();
+                
                 if (!response.ok) {
-                    throw new Error("Senden fehlgeschlagen");
+                    throw new Error(result.error || "Senden fehlgeschlagen");
                 }
                 
                 await refreshChat();
             } catch (err) {
                 console.error("Send error:", err);
                 chatInput.value = originalValue;
-                alert("Fehler beim Senden!");
+                alert("Fehler: " + err.message);
             } finally {
                 chatInput.placeholder = `Nachricht an #${currentChannel}`;
                 chatInput.focus();

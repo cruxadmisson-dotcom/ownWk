@@ -5,14 +5,7 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-// We MUST disable bodyParser to handle files correctly, 
-// and we'll parse JSON manually for chat messages.
-const config = {
-    api: {
-        bodyParser: false,
-    },
-};
-
+// Helper to get body buffer from stream
 const getRawBody = async (req) => {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -23,6 +16,7 @@ const getRawBody = async (req) => {
 };
 
 const handler = async (req, res) => {
+    // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -38,51 +32,69 @@ const handler = async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
+        // Read the stream ONCE
         const buffer = await getRawBody(req);
         
+        if (!buffer || buffer.length === 0) {
+            return res.status(400).json({ error: "Empty request body" });
+        }
+
         // --- CASE 1: FILE UPLOAD ---
         if (fileName || contentType.includes('application/octet-stream')) {
             const safeFileName = `${Date.now()}_${fileName || 'file'}`;
             
             const { error: storageError } = await supabase.storage
                 .from('uploads')
-                .upload(safeFileName, buffer, { contentType: contentType || 'application/octet-stream' });
+                .upload(safeFileName, buffer, { 
+                    contentType: contentType || 'application/octet-stream',
+                    cacheControl: '3600',
+                    upsert: false
+                });
 
             if (storageError) throw storageError;
 
-            const publicUrl = supabase.storage.from('uploads').getPublicUrl(safeFileName).data.publicUrl;
+            const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(safeFileName);
 
-            await supabase.from('events').insert([{
+            const { error: dbError } = await supabase.from('events').insert([{
                 type: 'upload',
                 timestamp,
                 name: fileName || 'file',
                 size: buffer.length,
                 path: publicUrl,
-                content: channelId, // Channel Name
+                content: channelId,
                 headers: JSON.stringify({ ip })
             }]);
 
-            return res.status(200).send('OK');
+            if (dbError) throw dbError;
+            return res.status(200).json({ success: true, message: "File uploaded" });
         } 
         
         // --- CASE 2: CHAT MESSAGE OR JSON WEBHOOK ---
-        const rawContent = buffer.toString();
+        const rawContent = buffer.toString('utf-8');
         
-        // We store everything in 'events' table
-        await supabase.from('events').insert([{
+        const { error: dbError } = await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
             content: rawContent,
-            name: channelId, // Channel Name
+            name: channelId,
             headers: JSON.stringify({ ip })
         }]);
 
-        res.status(200).send('OK');
+        if (dbError) throw dbError;
+
+        return res.status(200).json({ success: true, message: "Message saved" });
     } catch (error) {
-        console.error("Critical Webhook Error:", error);
-        res.status(500).json({ error: error.message });
+        console.error("Webhook Handler Error:", error);
+        return res.status(500).json({ 
+            error: error.message, 
+            details: "Please check Supabase connection and table structure." 
+        });
     }
 };
 
 module.exports = handler;
-module.exports.config = config;
+module.exports.config = {
+    api: {
+        bodyParser: false,
+    },
+};
