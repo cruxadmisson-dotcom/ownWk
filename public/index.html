@@ -295,7 +295,14 @@
                     })
                 });
                 
-                const result = await response.json();
+                let result;
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    result = await response.json();
+                } else {
+                    const text = await response.text();
+                    result = { error: text || "Unbekannter Server-Fehler" };
+                }
                 
                 if (!response.ok) {
                     throw new Error(result.error || "Senden fehlgeschlagen");
