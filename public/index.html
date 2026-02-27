@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ownWk | Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Emoji Picker Library -->
+    <script src="https://cdn.jsdelivr.net/npm/picmo@latest/dist/umd/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@picmo/popup-picker@latest/dist/umd/index.js"></script>
     <style>
         :root {
             --discord-dark: #313338;
@@ -128,6 +131,50 @@
         .chat-input-icons i:hover {
             color: var(--discord-text);
         }
+
+        /* Upload Menu */
+        .upload-menu {
+            position: absolute;
+            bottom: 80px;
+            left: 16px;
+            background-color: #111214;
+            border-radius: 8px;
+            padding: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            z-index: 1000;
+            width: 200px;
+        }
+        .upload-menu-item {
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: var(--discord-text);
+            font-size: 14px;
+        }
+        .upload-menu-item:hover {
+            background-color: var(--discord-blue);
+            color: white;
+        }
+        .upload-menu-item i {
+            width: 16px;
+            text-align: center;
+            opacity: 0.7;
+        }
+
+        /* Emoji Picker Styling */
+        .picker-container {
+            position: absolute;
+            bottom: 80px;
+            right: 16px;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
@@ -175,12 +222,32 @@
         </div>
         <!-- Chat Input Area -->
         <div class="chat-input-container">
+            <div class="upload-menu" id="upload-menu">
+                <div class="upload-menu-item" onclick="triggerFileUpload()">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                    <span>Datei hochladen</span>
+                </div>
+                <div class="upload-menu-item">
+                    <i class="fa-solid fa-square-poll-horizontal"></i>
+                    <span>Umfrage erstellen</span>
+                </div>
+                <div class="upload-menu-item">
+                    <i class="fa-solid fa-shapes"></i>
+                    <span>Verwende Apps</span>
+                </div>
+            </div>
+            <div id="emoji-picker-container" class="picker-container"></div>
+            
             <div class="chat-input-wrapper">
-                <i class="fa-solid fa-circle-plus" style="margin-right: 16px; color: var(--discord-muted); cursor: pointer;"></i>
+                <i class="fa-solid fa-circle-plus" id="upload-btn" style="margin-right: 16px; color: var(--discord-muted); cursor: pointer; font-size: 20px;"></i>
                 <input type="text" class="chat-input" id="message-input" placeholder="Message #incoming-data">
+                <input type="file" id="hidden-file-input" style="display: none;" onchange="handleManualUpload(this)">
                 <div class="chat-input-icons">
                     <i class="fa-solid fa-gift"></i>
-                    <i class="fa-solid fa-face-smile"></i>
+                    <i class="fa-solid fa-bolt"></i>
+                    <i class="fa-solid fa-note-sticky"></i>
+                    <i class="fa-solid fa-face-smile" id="emoji-btn"></i>
+                    <i class="fa-solid fa-square-plus"></i>
                 </div>
             </div>
         </div>
@@ -333,7 +400,73 @@
                     sendMessage();
                 }
             });
+
+            // --- Upload Menu Toggle ---
+            const uploadBtn = document.getElementById('upload-btn');
+            const uploadMenu = document.getElementById('upload-menu');
+            uploadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                uploadMenu.style.display = uploadMenu.style.display === 'flex' ? 'none' : 'flex';
+            });
+
+            // --- Emoji Picker ---
+            const emojiBtn = document.getElementById('emoji-btn');
+            const pickerContainer = document.getElementById('emoji-picker-container');
+            
+            // Using Picmo Emoji Picker
+            const picker = picmo.createPicker({
+                rootElement: pickerContainer
+            });
+
+            pickerContainer.style.display = 'none';
+
+            emojiBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                pickerContainer.style.display = pickerContainer.style.display === 'none' ? 'block' : 'none';
+            });
+
+            picker.addEventListener('emoji:select', (event) => {
+                messageInput.value += event.emoji;
+                pickerContainer.style.display = 'none';
+                messageInput.focus();
+            });
+
+            // Close menus on click outside
+            document.addEventListener('click', () => {
+                uploadMenu.style.display = 'none';
+                pickerContainer.style.display = 'none';
+            });
         };
+
+        function triggerFileUpload() {
+            document.getElementById('hidden-file-input').click();
+        }
+
+        async function handleManualUpload(input) {
+            if (input.files.length === 0) return;
+            
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // We reuse our webhook endpoint for manual uploads too
+                const response = await fetch(`${API_BASE_URL}/webhook`, {
+                    method: 'POST',
+                    headers: {
+                        'X-File-Name': file.name
+                    },
+                    body: file // Send as direct stream for our refined logic
+                });
+
+                if (response.ok) {
+                    loadWebhooks();
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+            }
+            input.value = ''; // Reset
+        }
 
         async function sendMessage() {
             const input = document.getElementById('message-input');
