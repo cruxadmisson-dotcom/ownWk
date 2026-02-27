@@ -1,10 +1,19 @@
 const { createClient } = require('@supabase/supabase-js');
-const Busboy = require('busboy');
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_ANON_KEY
 );
+
+// Helper to parse body if it's not already parsed
+const getRawBody = async (req) => {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => resolve(body));
+        req.on('error', err => reject(err));
+    });
+};
 
 module.exports = async (req, res) => {
     // Enable CORS
@@ -23,65 +32,63 @@ module.exports = async (req, res) => {
     }
 
     const timestamp = new Date().toISOString();
-    
-    // Check if it's a multipart (file upload) or JSON
     const contentType = req.headers['content-type'] || '';
-    
-    if (contentType.includes('multipart/form-data')) {
-        const busboy = Busboy({ headers: req.headers });
-        
-        busboy.on('file', async (fieldname, file, info) => {
-            const { filename, encoding, mimeType } = info;
-            const safeFileName = `${Date.now()}_${filename}`;
-            
-            // Upload to Supabase Storage
+    const fileName = req.headers['x-file-name'] || `file_${Date.now()}`;
+
+    try {
+        // If it's a direct file stream (octet-stream) or we have a file name header
+        if (contentType.includes('application/octet-stream') || req.headers['x-file-name']) {
             const chunks = [];
-            for await (const chunk of file) {
+            for await (const chunk of req) {
                 chunks.push(chunk);
             }
             const buffer = Buffer.concat(chunks);
+            const safeFileName = `${Date.now()}_${fileName}`;
             
-            const { data, error } = await supabase.storage
+            // Upload to Storage
+            const { error: storageError } = await supabase.storage
                 .from('uploads')
-                .upload(safeFileName, buffer, { contentType: mimeType });
+                .upload(safeFileName, buffer, { contentType: contentType || 'application/octet-stream' });
 
-            if (error) {
-                console.error('Storage error:', error);
-                return res.status(500).send('Storage Error');
-            }
+            if (storageError) throw storageError;
 
-            // Save metadata to database
-            const { error: dbError } = await supabase
-                .from('events')
-                .insert([{
-                    type: 'upload',
-                    timestamp,
-                    name: filename,
-                    size: buffer.length,
-                    path: supabase.storage.from('uploads').getPublicUrl(safeFileName).data.publicUrl
-                }]);
+            const publicUrl = supabase.storage.from('uploads').getPublicUrl(safeFileName).data.publicUrl;
 
-            if (dbError) console.error('DB error:', dbError);
-            res.status(200).send(`File uploaded successfully as ${safeFileName}`);
-        });
-
-        req.pipe(busboy);
-    } else {
-        // Handle JSON Webhook
-        const body = req.body;
-        const { error: dbError } = await supabase
-            .from('events')
-            .insert([{
-                type: 'webhook',
+            // Save to DB
+            await supabase.from('events').insert([{
+                type: 'upload',
                 timestamp,
-                content: typeof body === 'string' ? body : JSON.stringify(body),
-                headers: JSON.stringify(req.headers)
+                name: fileName,
+                size: buffer.length,
+                path: publicUrl
             }]);
 
-        if (dbError) {
-            console.error('DB error:', dbError);
-            return res.status(500).send('Database Error');
+            return res.status(200).send('File received and saved');
+        } 
+        
+        // Otherwise handle as a normal data webhook
+        const rawBody = await getRawBody(req);
+        let content = rawBody;
+        
+        // Try to parse as JSON if possible for better storage
+        try {
+            const json = JSON.parse(rawBody);
+            content = JSON.stringify(json, null, 2);
+        } catch (e) {
+            // Stay as raw string
         }
-        res.status(200).send('Webhook received successfully');
+
+        await supabase.from('events').insert([{
+            type: 'webhook',
+            timestamp,
+            content: content,
+            headers: JSON.stringify(req.headers)
+        }]);
+
+        res.status(200).send('Data received and saved');
+
+    } catch (error) {
+        console.error('Webhook Error:', error);
+        res.status(500).json({ error: error.message });
     }
 };
