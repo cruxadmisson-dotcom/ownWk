@@ -80,6 +80,10 @@
         .download-btn { color: var(--discord-muted); cursor: pointer; transition: 0.2s; }
         .download-btn:hover { color: white; }
 
+        /* Media Previews */
+        .media-preview { margin-top: 8px; border-radius: 8px; overflow: hidden; max-width: 400px; border: 1px solid rgba(255,255,255,0.05); }
+        .media-preview img, .media-preview video { width: 100%; display: block; }
+
         /* Webhook Info Card (Top of chat) */
         .webhook-welcome { padding: 16px; margin: 16px; background-color: var(--discord-darker); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
         .webhook-welcome h1 { font-size: 24px; color: white; margin-bottom: 8px; }
@@ -350,8 +354,17 @@
                     } else if (item.type === 'upload') {
                         avatarColor = '#f57731';
                         const isArchive = item.name.endsWith('.zip') || item.name.endsWith('.rar') || item.name.endsWith('.7z');
+                        const isImage = item.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                        const isVideo = item.name.match(/\.(mp4|webm|mov)$/i);
                         const iconClass = isArchive ? 'fa-file-archive' : 'fa-file';
                         
+                        let mediaHtml = '';
+                        if (isImage) {
+                            mediaHtml = `<div class="media-preview"><img src="${item.path}" alt="${item.name}"></div>`;
+                        } else if (isVideo) {
+                            mediaHtml = `<div class="media-preview"><video src="${item.path}" controls></video></div>`;
+                        }
+
                         contentHtml = `
                             <div class="msg-text">Sent an attachment:</div>
                             <div class="attachment">
@@ -364,6 +377,7 @@
                                     <i class="fa-solid fa-download"></i>
                                 </a>
                             </div>
+                            ${mediaHtml}
                         `;
                     }
 

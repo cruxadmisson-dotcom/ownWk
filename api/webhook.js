@@ -5,12 +5,18 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-// Helper to parse body if it's not already parsed
+// Configuration to disable Vercel's automatic body parsing
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};
+
 const getRawBody = async (req) => {
     return new Promise((resolve, reject) => {
-        let body = '';
-        req.on('data', chunk => body += chunk.toString());
-        req.on('end', () => resolve(body));
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
         req.on('error', err => reject(err));
     });
 };
@@ -37,16 +43,12 @@ module.exports = async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
-        // If it's a direct file stream (octet-stream) or we have a file name header
+        const buffer = await getRawBody(req);
+        
+        // --- CASE 1: FILE UPLOAD (Octet-stream or x-file-name header) ---
         if (contentType.includes('application/octet-stream') || req.headers['x-file-name']) {
-            const chunks = [];
-            for await (const chunk of req) {
-                chunks.push(chunk);
-            }
-            const buffer = Buffer.concat(chunks);
             const safeFileName = `${Date.now()}_${fileName}`;
             
-            // Upload to Storage
             const { error: storageError } = await supabase.storage
                 .from('uploads')
                 .upload(safeFileName, buffer, { contentType: contentType || 'application/octet-stream' });
@@ -55,37 +57,37 @@ module.exports = async (req, res) => {
 
             const publicUrl = supabase.storage.from('uploads').getPublicUrl(safeFileName).data.publicUrl;
 
-            // Save to DB
             await supabase.from('events').insert([{
                 type: 'upload',
                 timestamp,
                 name: fileName,
                 size: buffer.length,
                 path: publicUrl,
-                headers: JSON.stringify({ ...req.headers, ip: ip }) // Store IP in headers
+                headers: JSON.stringify({ ...req.headers, ip: ip })
             }]);
 
             return res.status(200).send('File received and saved');
         } 
         
-        // Otherwise handle as a normal data webhook
-        const rawBody = await getRawBody(req);
-        let content = rawBody;
+        // --- CASE 2: WEBHOOK OR CHAT MESSAGE ---
+        let content = buffer.toString();
         
-        // Try to parse as JSON if possible for better storage
+        // Try to parse as JSON
         try {
-            const json = JSON.parse(rawBody);
+            const json = JSON.parse(content);
             content = JSON.stringify(json, null, 2);
         } catch (e) {
-            // Stay as raw string
+            // content remains a string
         }
 
-        await supabase.from('events').insert([{
+        const { error: dbError } = await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
             content: content,
-            headers: JSON.stringify({ ...req.headers, ip: ip }) // Store IP in headers
+            headers: JSON.stringify({ ...req.headers, ip: ip })
         }]);
+
+        if (dbError) throw dbError;
 
         res.status(200).send('Data received and saved');
 
