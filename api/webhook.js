@@ -5,14 +5,6 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-// Configuration to disable Vercel's automatic body parsing
-// This must be at the top level
-module.exports.config = {
-    api: {
-        bodyParser: false,
-    },
-};
-
 const getRawBody = async (req) => {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -22,21 +14,14 @@ const getRawBody = async (req) => {
     });
 };
 
-module.exports = async (req, res) => {
-    // Enable CORS
+const handler = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-File-Name, X-Channel-Id');
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).send('Method Not Allowed');
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
     const timestamp = new Date().toISOString();
     const contentType = req.headers['content-type'] || '';
@@ -47,10 +32,8 @@ module.exports = async (req, res) => {
     try {
         const buffer = await getRawBody(req);
         
-        // --- CASE 1: FILE UPLOAD ---
         if (contentType.includes('application/octet-stream') || req.headers['x-file-name']) {
             const safeFileName = `${Date.now()}_${fileName}`;
-            
             const { error: storageError } = await supabase.storage
                 .from('uploads')
                 .upload(safeFileName, buffer, { contentType: contentType || 'application/octet-stream' });
@@ -65,28 +48,27 @@ module.exports = async (req, res) => {
                 name: fileName,
                 size: buffer.length,
                 path: publicUrl,
-                content: channelId, // Reuse content column for channelId
+                content: channelId,
                 headers: JSON.stringify({ ...req.headers, ip: ip })
             }]);
 
-            return res.status(200).send('File received and saved');
+            return res.status(200).send('File received');
         } 
         
-        // --- CASE 2: WEBHOOK OR CHAT MESSAGE ---
-        let content = buffer.toString();
-        
+        const content = buffer.toString();
         await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
             content: content,
-            name: channelId, // Reuse name column for channelId
+            name: channelId,
             headers: JSON.stringify({ ...req.headers, ip: ip })
         }]);
 
-        res.status(200).send('Data received and saved');
-
+        res.status(200).send('Saved');
     } catch (error) {
-        console.error('Webhook Error:', error);
         res.status(500).json({ error: error.message });
     }
 };
+
+module.exports = handler;
+module.exports.config = { api: { bodyParser: false } };
