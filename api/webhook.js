@@ -1,13 +1,25 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_ANON_KEY
 );
 
-// We keep the default bodyParser ENABLED for normal chat messages
-// This is the most stable way for Vercel functions
-module.exports = async (req, res) => {
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};
+
+const getRawBody = async (req) => {
+    const chunks = [];
+    for await (const chunk of req) {
+        chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+};
+
+export default async function handler(req, res) {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,32 +36,56 @@ module.exports = async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
 
     try {
-        // --- CASE 1: CHAT MESSAGE (JSON) ---
-        // Since we didn't disable bodyParser, req.body is already parsed
-        if (contentType.includes('application/json')) {
-            const body = req.body;
-            const content = typeof body === 'string' ? body : JSON.stringify(body);
+        const buffer = await getRawBody(req);
+        
+        if (!buffer || buffer.length === 0) {
+            return res.status(400).json({ error: "No data received" });
+        }
+
+        // --- CASE 1: FILE UPLOAD ---
+        if (fileName || contentType.includes('application/octet-stream')) {
+            const safeFileName = `${Date.now()}_${fileName || 'file'}`;
             
+            const { error: storageError } = await supabase.storage
+                .from('uploads')
+                .upload(safeFileName, buffer, { 
+                    contentType: contentType || 'application/octet-stream'
+                });
+
+            if (storageError) throw storageError;
+
+            const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(safeFileName);
+
             const { error: dbError } = await supabase.from('events').insert([{
-                type: 'webhook',
+                type: 'upload',
                 timestamp,
-                content: content,
-                name: channelId,
+                name: fileName || 'file',
+                size: buffer.length,
+                path: publicUrl,
+                content: channelId,
                 headers: JSON.stringify({ ip })
             }]);
 
             if (dbError) throw dbError;
             return res.status(200).json({ success: true });
-        }
+        } 
+        
+        // --- CASE 2: CHAT MESSAGE OR JSON WEBHOOK ---
+        const rawContent = buffer.toString('utf-8');
+        
+        const { error: dbError } = await supabase.from('events').insert([{
+            type: 'webhook',
+            timestamp,
+            content: rawContent,
+            name: channelId,
+            headers: JSON.stringify({ ip })
+        }]);
 
-        // --- CASE 2: FILE UPLOAD ---
-        // For files, we still need to handle the stream
-        // Note: This might conflict with bodyParser if not configured correctly,
-        // but for now we prioritize making CHAT work!
-        res.status(400).json({ error: 'Please send JSON for chat messages' });
+        if (dbError) throw dbError;
+        return res.status(200).json({ success: true });
 
     } catch (error) {
-        console.error("Webhook Error:", error);
-        res.status(500).json({ error: error.message });
+        console.error("Critical Error:", error);
+        return res.status(500).json({ error: error.message });
     }
-};
+}

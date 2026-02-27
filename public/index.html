@@ -189,16 +189,24 @@
         async function refreshChat() {
             try {
                 const res = await fetch(`${API_BASE_URL}/list`);
-                if (!res.ok) return;
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error("List fetch error:", errorText);
+                    return;
+                }
                 const data = await res.json();
                 
+                // Filter messages for current channel
                 const filtered = data.filter(item => {
                     if (item.type === 'upload') return item.content === currentChannel || (!item.content && currentChannel === 'andere');
                     return item.name === currentChannel || (!item.name && currentChannel === 'andere');
                 });
                 
                 renderMessages(filtered);
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error("Fetch error:", err);
+                chatFeed.innerHTML = `<div style="color: #f23f43; padding: 20px;">Fehler beim Laden der Nachrichten. Prüfe die Konsole.</div>`;
+            }
         }
 
         function renderMessages(data) {

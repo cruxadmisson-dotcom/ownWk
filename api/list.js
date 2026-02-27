@@ -1,12 +1,13 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_ANON_KEY
 );
 
-module.exports = async (req, res) => {
-    res.setHeader('Access-Control-Allow-Credentials', true);
+export default async function handler(req, res) {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
@@ -22,6 +23,10 @@ module.exports = async (req, res) => {
         if (error) {
             console.error('Supabase error:', error);
             return res.status(500).json({ error: error.message });
+        }
+
+        if (!data) {
+            return res.status(200).json([]);
         }
 
         // Map events to the structure expected by the frontend
@@ -40,4 +45,4 @@ module.exports = async (req, res) => {
         console.error('List API Error:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-};
+}
