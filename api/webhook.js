@@ -5,9 +5,24 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-// We RE-ENABLE bodyParser to make chat messages easy, 
-// but we handle files via the raw request if needed.
-module.exports = async (req, res) => {
+// We MUST disable bodyParser to handle files correctly, 
+// and we'll parse JSON manually for chat messages.
+const config = {
+    api: {
+        bodyParser: false,
+    },
+};
+
+const getRawBody = async (req) => {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', err => reject(err));
+    });
+};
+
+const handler = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -23,13 +38,10 @@ module.exports = async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
-        // --- CASE 1: FILE UPLOAD (handled as stream) ---
+        const buffer = await getRawBody(req);
+        
+        // --- CASE 1: FILE UPLOAD ---
         if (fileName || contentType.includes('application/octet-stream')) {
-            const chunks = [];
-            for await (const chunk of req) {
-                chunks.push(chunk);
-            }
-            const buffer = Buffer.concat(chunks);
             const safeFileName = `${Date.now()}_${fileName || 'file'}`;
             
             const { error: storageError } = await supabase.storage
@@ -46,29 +58,31 @@ module.exports = async (req, res) => {
                 name: fileName || 'file',
                 size: buffer.length,
                 path: publicUrl,
-                content: channelId,
+                content: channelId, // Channel Name
                 headers: JSON.stringify({ ip })
             }]);
 
             return res.status(200).send('OK');
         } 
         
-        // --- CASE 2: CHAT MESSAGE OR JSON (handled by Vercel's default parser) ---
-        // Vercel parses JSON automatically if bodyParser is not disabled.
-        const body = req.body;
-        const content = typeof body === 'object' ? JSON.stringify(body) : body.toString();
-
+        // --- CASE 2: CHAT MESSAGE OR JSON WEBHOOK ---
+        const rawContent = buffer.toString();
+        
+        // We store everything in 'events' table
         await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
-            content: content,
-            name: channelId,
+            content: rawContent,
+            name: channelId, // Channel Name
             headers: JSON.stringify({ ip })
         }]);
 
         res.status(200).send('OK');
     } catch (error) {
-        console.error("Webhook Error:", error);
+        console.error("Critical Webhook Error:", error);
         res.status(500).json({ error: error.message });
     }
 };
+
+module.exports = handler;
+module.exports.config = config;
