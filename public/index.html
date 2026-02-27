@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Own Webhook System</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { color: #333; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+        .status { margin-top: 10px; font-weight: bold; }
+        .feed-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+            border-left: 5px solid #007bff; /* Accent color */
+        }
+        .feed-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .feed-item-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 1.1em;
+        }
+        .feed-item-timestamp {
+            font-size: 0.8em;
+            color: #777;
+        }
+        .feed-item-content div {
+            margin-bottom: 5px;
+        }
+        .feed-item-content pre {
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        .file-download-link {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .file-download-link:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Own Webhook Dashboard</h1>
+        <p>This is your local webhook system. You can send data to <code>/webhook</code> via POST.</p>
+        <div class="webhook-info">
+            <strong>Endpoint:</strong> <code id="webhook-endpoint"></code>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Received Events</h2>
+        <button onclick="loadWebhooks()">Refresh Feed</button>
+        <div id="webhook-list"></div>
+    </div>
+
+
+
+    <div class="card">
+        <h2>Send File</h2>
+        <p>Select a file to send to your webhook.</p>
+        <input type="file" id="fileInput">
+        <button onclick="sendFile()">Send File</button>
+        <div id="file-status" class="status"></div>
+    </div>
+
+    <script>
+        // For Vercel, the API endpoints are in the /api directory
+        const API_BASE_URL = window.location.origin + '/api'; 
+        
+        document.getElementById('webhook-endpoint').textContent = `${window.location.origin}/api/webhook`;
+
+        window.onload = () => {
+            loadWebhooks();
+            setInterval(loadWebhooks, 5000); // Refresh every 5 seconds
+        };
+
+        async function sendFile() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('file-status');
+            
+            if (fileInput.files.length === 0) {
+                statusDiv.textContent = 'Please select a file first.';
+                statusDiv.style.color = 'orange';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            statusDiv.textContent = 'Uploading ' + file.name + '...';
+            statusDiv.style.color = 'blue';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_BASE_URL}/webhook`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const text = await response.text();
+                statusDiv.textContent = 'Success: ' + text;
+                statusDiv.style.color = 'green';
+                loadWebhooks();
+            } catch (error) {
+                statusDiv.textContent = 'Error: ' + error.message;
+                statusDiv.style.color = 'red';
+            }
+        }
+
+        async function loadWebhooks() {
+            const listDiv = document.getElementById('webhook-list');
+            listDiv.innerHTML = '<p>Loading...</p>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/list`);
+                const data = await response.json();
+                
+                let combinedFeed = [];
+
+                if (data.webhooks) {
+                    combinedFeed = combinedFeed.concat(data.webhooks.map(webhook => ({
+                        type: 'webhook',
+                        timestamp: webhook.timestamp,
+                        content: webhook.body,
+                        headers: webhook.headers
+                    })));
+                }
+
+                if (data.uploads) {
+                    combinedFeed = combinedFeed.concat(data.uploads.map(upload => ({
+                        type: 'upload',
+                        timestamp: upload.time,
+                        name: upload.name,
+                        size: upload.size,
+                        path: upload.path
+                    })));
+                }
+
+                combinedFeed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                if (combinedFeed.length === 0) {
+                    listDiv.innerHTML = '<p>No webhooks or files received yet.</p>';
+                    return;
+                }
+
+                listDiv.innerHTML = '';
+                combinedFeed.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'feed-item';
+
+                    let contentHtml = '';
+                    let title = '';
+                    let timestamp = item.timestamp;
+
+                    if (item.type === 'webhook') {
+                        title = 'Webhook Received';
+                        contentHtml = `
+                            <div class="feed-item-content">
+                                <div><strong>Method:</strong> ${item.headers.method || 'POST'}</div>
+                                <div><strong>Content-Type:</strong> ${item.headers['Content-Type'] || 'N/A'}</div>
+                                <div><strong>Body:</strong> <pre>${item.content}</pre></div>
+                                <div><strong>Headers:</strong> <pre>${JSON.stringify(item.headers, null, 2)}</pre></div>
+                            </div>
+                        `;
+                    } else if (item.type === 'upload') {
+                        title = 'File Uploaded';
+                        contentHtml = `
+                            <div class="feed-item-content">
+                                <div><strong>File Name:</strong> ${item.name}</div>
+                                <div><strong>Size:</strong> ${(item.size / 1024).toFixed(2)} KB</div>
+                                <div><a href="${item.path}" target="_blank" class="file-download-link">Download File</a></div>
+                            </div>
+                        `;
+                    }
+
+                    itemDiv.innerHTML = `
+                        <div class="feed-item-header">
+                            <h3>${title}</h3>
+                            <span class="feed-item-timestamp">${new Date(timestamp).toLocaleString()}</span>
+                        </div>
+                        ${contentHtml}
+                    `;
+                    listDiv.appendChild(itemDiv);
+                });
+
+            } catch (error) {
+                listDiv.innerHTML = '<p style="color:red">Error loading data: ' + error.message + '</p>';
+            }
+        }
+
+
+    </script>
+</body>
+</html>

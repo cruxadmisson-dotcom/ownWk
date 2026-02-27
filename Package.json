@@ -1,7 +1,13 @@
 {
-  "name": "simple-webhook",
-  "type": "module",
+  "name": "custom-webhook-server",
+  "version": "1.0.0",
+  "main": "index.js",
   "dependencies": {
-    "express": "^4.18.2"
+    "@supabase/supabase-js": "^2.39.7",
+    "busboy": "^1.6.0",
+    "cors": "^2.8.5"
+  },
+  "scripts": {
+    "start": "node index.js"
   }
 }
