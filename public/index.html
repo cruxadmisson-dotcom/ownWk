@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord | #incoming-data</title>
+    <title>Discord | Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/picmo@latest/dist/umd/index.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@picmo/popup-picker@latest/dist/umd/index.js"></script>
@@ -24,24 +24,21 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
         body { background-color: var(--discord-darkest); color: var(--discord-text); display: flex; height: 100vh; overflow: hidden; }
 
-        /* Left Sidebar - Servers */
         .guilds-sidebar { width: 72px; background-color: var(--discord-darkest); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; flex-shrink: 0; }
         .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--discord-text); }
         .guild-icon:hover { border-radius: 30%; background-color: var(--discord-blue); color: white; }
         .guild-icon.active { border-radius: 30%; background-color: var(--discord-blue); color: white; }
         .guild-separator { width: 32px; height: 2px; background-color: var(--discord-dark); border-radius: 1px; margin: 4px 0; }
 
-        /* Channel Sidebar */
         .channels-sidebar { width: 240px; background-color: var(--discord-sidebar); display: flex; flex-direction: column; flex-shrink: 0; }
         .server-header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; color: white; box-shadow: 0 1px 0 rgba(0,0,0,0.2); cursor: pointer; }
         .channel-list { padding: 8px; flex: 1; overflow-y: auto; }
-        .channel-category { padding: 18px 8px 4px 8px; font-size: 12px; font-weight: bold; color: var(--discord-muted); text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; }
+        .channel-category { padding: 18px 8px 4px 8px; font-size: 12px; font-weight: bold; color: var(--discord-muted); text-transform: uppercase; }
         .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; }
         .channel-item:hover { background-color: rgba(255,255,255,0.05); color: var(--discord-text); }
         .channel-item.active { background-color: rgba(255,255,255,0.1); color: white; }
         .channel-item i { font-size: 18px; opacity: 0.6; }
 
-        /* User Panel */
         .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
         .user-avatar { width: 32px; height: 32px; border-radius: 50%; background-color: #5865f2; position: relative; }
         .user-avatar::after { content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background-color: var(--discord-green); border: 2px solid #232428; }
@@ -49,7 +46,6 @@
         .username { font-size: 14px; font-weight: bold; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .user-status { font-size: 12px; color: var(--discord-muted); }
 
-        /* Main Chat Area */
         .chat-container { flex: 1; display: flex; flex-direction: column; background-color: var(--discord-dark); min-width: 0; }
         .chat-header { height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 0 rgba(0,0,0,0.2); flex-shrink: 0; }
         .chat-header i { color: var(--discord-muted); font-size: 20px; }
@@ -57,74 +53,50 @@
 
         .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; }
 
-        /* Welcome Section (Match Screenshot) */
-        .welcome-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .welcome-section { margin-bottom: 24px; padding-bottom: 16px; }
         .welcome-hash { width: 68px; height: 68px; background-color: #41434a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 42px; color: white; margin-bottom: 16px; }
         .welcome-title { font-size: 32px; font-weight: 800; color: white; margin-bottom: 8px; }
-        .welcome-subtitle { color: var(--discord-muted); font-size: 16px; margin-bottom: 16px; }
-        .edit-channel-btn { background-color: #4e5058; color: white; border: none; padding: 6px 16px; border-radius: 3px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; }
-        .edit-channel-btn:hover { background-color: #6d6f78; }
+        .welcome-subtitle { color: var(--discord-muted); font-size: 16px; }
 
-        /* Message Styling */
         .message { display: flex; gap: 16px; padding: 2px 16px; margin-top: 1.0625rem; }
-        .message:hover { background-color: rgba(0,0,0,0.05); }
         .msg-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; }
         .msg-content { flex: 1; min-width: 0; }
         .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-        .msg-author { font-weight: 500; color: white; cursor: pointer; }
-        .msg-author:hover { text-decoration: underline; }
+        .msg-author { font-weight: 500; color: white; }
         .msg-timestamp { font-size: 12px; color: var(--discord-muted); }
         .msg-text { color: var(--discord-text); line-height: 1.375rem; white-space: pre-wrap; word-wrap: break-word; }
 
-        /* Media & Attachments */
         .attachment-box { margin-top: 8px; background-color: var(--discord-darker); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 12px; display: flex; align-items: center; gap: 12px; max-width: 400px; }
         .media-preview { margin-top: 8px; border-radius: 8px; overflow: hidden; max-width: 550px; border: 1px solid rgba(255,255,255,0.05); }
         .media-preview img, .media-preview video { max-width: 100%; display: block; max-height: 400px; }
 
-        /* Chat Input */
         .chat-input-area { padding: 0 16px 24px 16px; flex-shrink: 0; }
         .input-wrapper { background-color: var(--discord-input); border-radius: 8px; display: flex; align-items: center; padding: 0 16px; min-height: 44px; position: relative; }
-        .plus-btn { font-size: 20px; color: var(--discord-muted); cursor: pointer; margin-right: 16px; transition: 0.2s; }
-        .plus-btn:hover { color: var(--discord-text); }
+        .plus-btn { font-size: 20px; color: var(--discord-muted); cursor: pointer; margin-right: 16px; }
         .main-input { flex: 1; background: transparent; border: none; color: var(--discord-text); font-size: 16px; outline: none; padding: 11px 0; }
         .input-icons { display: flex; gap: 16px; color: var(--discord-muted); font-size: 20px; }
-        .input-icons i { cursor: pointer; transition: 0.2s; }
-        .input-icons i:hover { color: var(--discord-text); }
-
-        /* Floating Menus */
-        .upload-menu { position: absolute; bottom: 60px; left: 0; background-color: #111214; border-radius: 8px; padding: 8px; display: none; flex-direction: column; width: 200px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); z-index: 100; }
-        .menu-item { padding: 8px 12px; border-radius: 4px; display: flex; align-items: center; gap: 12px; color: var(--discord-text); font-size: 14px; cursor: pointer; }
-        .menu-item:hover { background-color: var(--discord-blue); color: white; }
+        .input-icons i { cursor: pointer; }
         .emoji-picker-pop { position: absolute; bottom: 60px; right: 0; z-index: 100; display: none; }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <!-- Server Sidebar -->
     <div class="guilds-sidebar">
         <div class="guild-icon active"><i class="fa-brands fa-discord" style="font-size: 28px;"></i></div>
         <div class="guild-separator"></div>
         <div class="guild-icon">PS</div>
-        <div class="guild-icon"><img src="https://via.placeholder.com/48" style="border-radius: 50%; width: 100%;"></div>
         <div class="guild-icon"><i class="fa-solid fa-plus"></i></div>
     </div>
 
-    <!-- Channel Sidebar -->
     <div class="channels-sidebar">
         <div class="server-header">
             <span>Privat Server</span>
             <i class="fa-solid fa-chevron-down" style="font-size: 14px;"></i>
         </div>
-        <div class="channel-list">
-            <div class="channel-category">Textkanäle <i class="fa-solid fa-plus" style="font-size: 12px;"></i></div>
-            <div class="channel-item"><i class="fa-solid fa-hashtag"></i> websiten</div>
-            <div class="channel-item"><i class="fa-solid fa-hashtag"></i> kleidungen</div>
-            <div class="channel-item"><i class="fa-solid fa-hashtag"></i> logos</div>
-            <div class="channel-item active"><i class="fa-solid fa-hashtag"></i> andere</div>
+        <div class="channel-list" id="channel-list">
+            <div class="channel-category">Textkanäle</div>
+            <div class="channel-item active" onclick="switchChannel('andere')"><i class="fa-solid fa-hashtag"></i> andere</div>
+            <div class="channel-item" onclick="switchChannel('websiten')"><i class="fa-solid fa-hashtag"></i> websiten</div>
+            <div class="channel-item" onclick="switchChannel('logos')"><i class="fa-solid fa-hashtag"></i> logos</div>
         </div>
         <div class="user-panel">
             <div class="user-avatar"></div>
@@ -140,7 +112,6 @@
         </div>
     </div>
 
-    <!-- Main Chat -->
     <div class="chat-container">
         <div class="chat-header">
             <i class="fa-solid fa-hashtag"></i>
@@ -148,37 +119,20 @@
         </div>
         
         <div class="chat-messages" id="chat-feed">
-            <!-- Messages load here -->
             <div style="color: var(--discord-muted); padding: 20px;">Lade Nachrichten...</div>
         </div>
 
         <div class="chat-input-area">
             <div class="input-wrapper">
-                <div class="upload-menu" id="upload-menu">
-                    <div class="menu-item" onclick="document.getElementById('file-input').click()">
-                        <i class="fa-solid fa-file-arrow-up"></i> Datei hochladen
-                    </div>
-                    <div class="menu-item"><i class="fa-solid fa-square-poll-horizontal"></i> Umfrage erstellen</div>
-                </div>
-                <i class="fa-solid fa-circle-plus plus-btn" id="plus-btn"></i>
+                <i class="fa-solid fa-circle-plus plus-btn" onclick="document.getElementById('file-input').click()"></i>
                 <input type="text" class="main-input" id="chat-input" placeholder="Nachricht an #andere">
                 <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(this)">
                 
                 <div class="input-icons">
-                    <i class="fa-solid fa-gift"></i>
-                    <i class="fa-solid fa-bolt"></i>
-                    <i class="fa-solid fa-note-sticky"></i>
                     <i class="fa-solid fa-face-smile" id="emoji-btn"></i>
                 </div>
                 <div class="emoji-picker-pop" id="emoji-picker"></div>
             </div>
-        </div>
-    </div>
-
-    <!-- Context Menu -->
-    <div id="context-menu" style="position: fixed; background: #111214; padding: 8px; border-radius: 4px; display: none; z-index: 1000; width: 180px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);">
-        <div class="menu-item" id="delete-channel-opt" style="color: #f23f43;">
-            <i class="fa-solid fa-trash-can"></i> Kanal löschen
         </div>
     </div>
 
@@ -187,31 +141,18 @@
         const chatFeed = document.getElementById('chat-feed');
         const chatInput = document.getElementById('chat-input');
         
-        let currentChannelId = 'general';
-        let currentChannelName = 'andere';
-        let channels = [];
+        let currentChannel = 'andere';
 
-        // Initial Load
-        window.onload = async () => {
-            await loadChannels();
+        window.onload = () => {
             refreshChat();
             setInterval(refreshChat, 3000);
 
-            // Setup Enter Key
             chatInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     sendChatMessage();
                 }
             });
-
-            // Setup Menus
-            const plusBtn = document.getElementById('plus-btn');
-            const uploadMenu = document.getElementById('upload-menu');
-            plusBtn.onclick = (e) => {
-                e.stopPropagation();
-                uploadMenu.style.display = uploadMenu.style.display === 'flex' ? 'none' : 'flex';
-            };
 
             const emojiBtn = document.getElementById('emoji-btn');
             const emojiPicker = document.getElementById('emoji-picker');
@@ -229,70 +170,19 @@
             });
 
             document.onclick = () => {
-                uploadMenu.style.display = 'none';
                 emojiPicker.style.display = 'none';
-                document.getElementById('context-menu').style.display = 'none';
             };
         };
 
-        async function loadChannels() {
-            try {
-                const res = await fetch(`${API_BASE_URL}/channels`);
-                if (res.ok) {
-                    channels = await res.json();
-                    renderChannelList();
-                }
-            } catch (err) { console.error(err); }
-        }
-
-        function renderChannelList() {
-            const list = document.querySelector('.channel-list');
-            list.innerHTML = `<div class="channel-category">Textkanäle <i class="fa-solid fa-plus" onclick="createNewChannel()" style="cursor:pointer;"></i></div>`;
-            
-            channels.forEach(ch => {
-                const item = document.createElement('div');
-                item.className = `channel-item ${currentChannelId === ch.id ? 'active' : ''}`;
-                item.innerHTML = `<i class="fa-solid fa-hashtag"></i> ${ch.name}`;
-                item.onclick = () => switchChannel(ch.id, ch.name);
-                item.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    showContextMenu(e, ch.id);
-                };
-                list.appendChild(item);
-            });
-        }
-
-        function showContextMenu(e, id) {
-            const menu = document.getElementById('context-menu');
-            menu.style.top = `${e.clientY}px`;
-            menu.style.left = `${e.clientX}px`;
-            menu.style.display = 'block';
-            document.getElementById('delete-channel-opt').onclick = () => deleteChannel(id);
-        }
-
-        async function createNewChannel() {
-            const name = prompt("Kanalname eingeben:");
-            if (!name) return;
-            await fetch(`${API_BASE_URL}/channels`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            });
-            await loadChannels();
-        }
-
-        async function deleteChannel(id) {
-            if (!confirm("Kanal wirklich löschen?")) return;
-            await fetch(`${API_BASE_URL}/channels?id=${id}`, { method: 'DELETE' });
-            await loadChannels();
-        }
-
-        function switchChannel(id, name) {
-            currentChannelId = id;
-            currentChannelName = name;
+        function switchChannel(name) {
+            currentChannel = name;
             document.getElementById('current-channel-name').innerText = name;
             document.getElementById('chat-input').placeholder = `Nachricht an #${name}`;
-            renderChannelList();
+            
+            document.querySelectorAll('.channel-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.innerText.includes(name)) item.classList.add('active');
+            });
             refreshChat();
         }
 
@@ -302,24 +192,21 @@
                 if (!res.ok) return;
                 const data = await res.json();
                 
-                // Filter messages for current channel
                 const filtered = data.filter(item => {
-                    if (item.type === 'upload') return item.content === currentChannelId || (currentChannelId === 'general' && !item.content);
-                    return item.name === currentChannelId || (currentChannelId === 'general' && !item.name);
+                    if (item.type === 'upload') return item.content === currentChannel || (!item.content && currentChannel === 'andere');
+                    return item.name === currentChannel || (!item.name && currentChannel === 'andere');
                 });
                 
                 renderMessages(filtered);
-            } catch (err) {
-                console.error("Fetch error:", err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         function renderMessages(data) {
             let html = `
                 <div class="welcome-section">
                     <div class="welcome-hash">#</div>
-                    <h1 class="welcome-title">Willkommen bei #${currentChannelName}!</h1>
-                    <p class="welcome-subtitle">Das ist der Beginn des Kanals #${currentChannelName}.</p>
+                    <h1 class="welcome-title">Willkommen bei #${currentChannel}!</h1>
+                    <p class="welcome-subtitle">Das ist der Beginn des Kanals #${currentChannel}.</p>
                 </div>
             `;
 
@@ -393,10 +280,7 @@
             
             await fetch(`${API_BASE_URL}/webhook`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-Channel-Id': currentChannelId
-                },
+                headers: { 'Content-Type': 'application/json', 'X-Channel-Id': currentChannel },
                 body: JSON.stringify({ type: 'chat_message', content: text, author: 'Admin' })
             });
             refreshChat();
@@ -407,18 +291,10 @@
             const file = input.files[0];
             await fetch(`${API_BASE_URL}/webhook`, {
                 method: 'POST',
-                headers: { 
-                    'X-File-Name': file.name,
-                    'X-Channel-Id': currentChannelId
-                },
+                headers: { 'X-File-Name': file.name, 'X-Channel-Id': currentChannel },
                 body: file
             });
             refreshChat();
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-            alert("Webhook-URL kopiert!");
         }
     </script>
 </body>

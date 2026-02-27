@@ -26,7 +26,7 @@ const handler = async (req, res) => {
     const timestamp = new Date().toISOString();
     const contentType = req.headers['content-type'] || '';
     const fileName = req.headers['x-file-name'] || `file_${Date.now()}`;
-    const channelId = req.headers['x-channel-id'] || 'general';
+    const channelId = req.headers['x-channel-id'] || 'andere';
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
