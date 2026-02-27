@@ -5,16 +5,9 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-const getRawBody = async (req) => {
-    return new Promise((resolve, reject) => {
-        const chunks = [];
-        req.on('data', chunk => chunks.push(chunk));
-        req.on('end', () => resolve(Buffer.concat(chunks)));
-        req.on('error', err => reject(err));
-    });
-};
-
-const handler = async (req, res) => {
+// We RE-ENABLE bodyParser to make chat messages easy, 
+// but we handle files via the raw request if needed.
+module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -25,15 +18,20 @@ const handler = async (req, res) => {
 
     const timestamp = new Date().toISOString();
     const contentType = req.headers['content-type'] || '';
-    const fileName = req.headers['x-file-name'] || `file_${Date.now()}`;
+    const fileName = req.headers['x-file-name'];
     const channelId = req.headers['x-channel-id'] || 'andere';
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
-        const buffer = await getRawBody(req);
-        
-        if (contentType.includes('application/octet-stream') || req.headers['x-file-name']) {
-            const safeFileName = `${Date.now()}_${fileName}`;
+        // --- CASE 1: FILE UPLOAD (handled as stream) ---
+        if (fileName || contentType.includes('application/octet-stream')) {
+            const chunks = [];
+            for await (const chunk of req) {
+                chunks.push(chunk);
+            }
+            const buffer = Buffer.concat(chunks);
+            const safeFileName = `${Date.now()}_${fileName || 'file'}`;
+            
             const { error: storageError } = await supabase.storage
                 .from('uploads')
                 .upload(safeFileName, buffer, { contentType: contentType || 'application/octet-stream' });
@@ -45,30 +43,32 @@ const handler = async (req, res) => {
             await supabase.from('events').insert([{
                 type: 'upload',
                 timestamp,
-                name: fileName,
+                name: fileName || 'file',
                 size: buffer.length,
                 path: publicUrl,
                 content: channelId,
-                headers: JSON.stringify({ ...req.headers, ip: ip })
+                headers: JSON.stringify({ ip })
             }]);
 
-            return res.status(200).send('File received');
+            return res.status(200).send('OK');
         } 
         
-        const content = buffer.toString();
+        // --- CASE 2: CHAT MESSAGE OR JSON (handled by Vercel's default parser) ---
+        // Vercel parses JSON automatically if bodyParser is not disabled.
+        const body = req.body;
+        const content = typeof body === 'object' ? JSON.stringify(body) : body.toString();
+
         await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
             content: content,
             name: channelId,
-            headers: JSON.stringify({ ...req.headers, ip: ip })
+            headers: JSON.stringify({ ip })
         }]);
 
-        res.status(200).send('Saved');
+        res.status(200).send('OK');
     } catch (error) {
+        console.error("Webhook Error:", error);
         res.status(500).json({ error: error.message });
     }
 };
-
-module.exports = handler;
-module.exports.config = { api: { bodyParser: false } };
