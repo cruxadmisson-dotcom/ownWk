@@ -271,16 +271,20 @@
 
         async function loadWebhooks() {
             const listDiv = document.getElementById('webhook-list');
+            if (!listDiv) {
+                console.error("Critical: 'webhook-list' element not found!");
+                return;
+            }
             
             try {
                 const response = await fetch(`${API_BASE_URL}/list`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 
                 let combinedFeed = [];
 
                 if (data.webhooks) {
-                    combinedFeed = combinedFeed.concat(data.webhooks.map(webhook => {
-                        // Handle both raw strings and JSON from our 'events' table
+                    data.webhooks.forEach(webhook => {
                         let content = webhook.body;
                         let author = 'Webhook';
                         let isChat = false;
@@ -294,32 +298,35 @@
                             }
                         } catch (e) {}
 
-                        return {
+                        combinedFeed.push({
                             type: isChat ? 'chat' : 'webhook',
                             timestamp: webhook.timestamp,
                             content: content,
                             author: author,
-                            headers: webhook.headers
-                        };
-                    }));
+                            headers: typeof webhook.headers === 'string' ? JSON.parse(webhook.headers) : webhook.headers
+                        });
+                    });
                 }
 
                 if (data.uploads) {
-                    combinedFeed = combinedFeed.concat(data.uploads.map(upload => ({
-                        type: 'upload',
-                        timestamp: upload.time,
-                        name: upload.name,
-                        size: upload.size,
-                        path: upload.path,
-                        author: 'File Bot'
-                    })));
+                    data.uploads.forEach(upload => {
+                        combinedFeed.push({
+                            type: 'upload',
+                            timestamp: upload.time,
+                            name: upload.name,
+                            size: upload.size,
+                            path: upload.path,
+                            author: 'File Bot',
+                            headers: typeof upload.headers === 'string' ? JSON.parse(upload.headers) : upload.headers
+                        });
+                    });
                 }
 
-                // Sort by time ASCENDING (oldest top, newest bottom like Discord)
+                // Sort oldest to newest
                 combinedFeed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-                // Clear and render
-                listDiv.innerHTML = `
+                // Always start with welcome message
+                let html = `
                     <div class="webhook-welcome">
                         <h1>Welcome to #incoming-data</h1>
                         <p>This is your private receiver. Any data sent to your webhook link will appear here instantly.</p>
@@ -331,9 +338,6 @@
                 `;
 
                 combinedFeed.forEach(item => {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message';
-
                     const timestamp = new Date(item.timestamp);
                     const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     const dateString = timestamp.toLocaleDateString();
@@ -350,7 +354,7 @@
                         contentHtml = `<div class="msg-text">${item.content}</div>`;
                     } else if (item.type === 'webhook') {
                         avatarColor = '#23a559';
-                        contentHtml = `<div class="msg-text"><pre style="background: rgba(0,0,0,0.2); border: none; padding: 8px;">${item.content}</pre></div>`;
+                        contentHtml = `<div class="msg-text"><pre style="background: rgba(0,0,0,0.2); border: none; padding: 8px; border-radius: 4px; overflow-x: auto;">${item.content}</pre></div>`;
                     } else if (item.type === 'upload') {
                         avatarColor = '#f57731';
                         const isArchive = item.name.endsWith('.zip') || item.name.endsWith('.rar') || item.name.endsWith('.7z');
@@ -360,9 +364,9 @@
                         
                         let mediaHtml = '';
                         if (isImage) {
-                            mediaHtml = `<div class="media-preview"><img src="${item.path}" alt="${item.name}"></div>`;
+                            mediaHtml = `<div class="media-preview"><img src="${item.path}" style="max-width: 100%; border-radius: 4px; margin-top: 8px;"></div>`;
                         } else if (isVideo) {
-                            mediaHtml = `<div class="media-preview"><video src="${item.path}" controls></video></div>`;
+                            mediaHtml = `<div class="media-preview"><video src="${item.path}" controls style="max-width: 100%; border-radius: 4px; margin-top: 8px;"></video></div>`;
                         }
 
                         contentHtml = `
@@ -381,20 +385,21 @@
                         `;
                     }
 
-                    messageDiv.innerHTML = `
-                        <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
-                        <div class="msg-content">
-                            <div class="msg-header">
-                                <span class="msg-author">${displayAuthor}</span>
-                                <span class="msg-timestamp">${dateString} at ${timeString}</span>
+                    html += `
+                        <div class="message">
+                            <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
+                            <div class="msg-content">
+                                <div class="msg-header">
+                                    <span class="msg-author">${displayAuthor}</span>
+                                    <span class="msg-timestamp">${dateString} at ${timeString}</span>
+                                </div>
+                                ${contentHtml}
                             </div>
-                            ${contentHtml}
                         </div>
                     `;
-                    listDiv.appendChild(messageDiv);
                 });
 
-                // Auto-scroll to bottom
+                listDiv.innerHTML = html;
                 listDiv.scrollTop = listDiv.scrollHeight;
 
             } catch (error) {
