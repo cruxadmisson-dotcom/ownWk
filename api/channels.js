@@ -1,9 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-);
+// --- Helper: Safe Supabase Client ---
+const getSupabase = () => {
+    const url = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+    const key = process.env.SUPABASE_ANON_KEY || 'placeholder';
+    return createClient(url, key);
+};
 
 module.exports = async (req, res) => {
     // Enable CORS
@@ -17,6 +19,8 @@ module.exports = async (req, res) => {
     const { method } = req;
 
     try {
+        const supabase = getSupabase();
+
         if (method === 'GET') {
             const { data, error } = await supabase.from('channels').select('*').order('created_at', { ascending: true });
             if (error) throw error;

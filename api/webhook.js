@@ -1,19 +1,15 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// --- Environment Variable Check ---
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+// --- Helper: Safe Supabase Client ---
+// We initialize this lazily or with placeholders to prevent
+// the function from crashing on boot if env vars are missing.
+const getSupabase = () => {
+    const url = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+    const key = process.env.SUPABASE_ANON_KEY || 'placeholder';
+    return createClient(url, key);
+};
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error("Missing Supabase environment variables!");
-}
-
-const supabase = createClient(
-    SUPABASE_URL || 'https://placeholder.supabase.co',
-    SUPABASE_ANON_KEY || 'placeholder'
-);
-
-// Robust buffer reading
+// --- Helper: Read Raw Body ---
 const getRawBody = async (req) => {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -23,6 +19,7 @@ const getRawBody = async (req) => {
     });
 };
 
+// --- Main Handler ---
 module.exports = async (req, res) => {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -32,19 +29,18 @@ module.exports = async (req, res) => {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    // Health Check / Debug Endpoint
-    if (req.method === 'GET') {
-        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-            return res.status(500).json({ error: "Supabase Environment Variables Missing on Server" });
-        }
-        return res.status(200).json({ status: "Webhook is online", timestamp: new Date().toISOString() });
+    // 1. Check Env Vars (Graceful Failure)
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+        console.error("Missing Supabase Environment Variables!");
+        // We return 500 but as JSON, so the client can show a helpful error
+        return res.status(500).json({ 
+            error: "Server Configuration Error", 
+            details: "SUPABASE_URL or SUPABASE_ANON_KEY is missing in Vercel Settings." 
+        });
     }
 
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
-
-    // Check Env Vars before processing
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        return res.status(500).json({ error: "Server Configuration Error: Missing Supabase Keys" });
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     const timestamp = new Date().toISOString();
@@ -54,10 +50,11 @@ module.exports = async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
 
     try {
+        const supabase = getSupabase();
         const buffer = await getRawBody(req);
         
         if (!buffer || buffer.length === 0) {
-            return res.status(400).json({ error: "No data received in body" });
+            return res.status(400).json({ error: "Empty request body" });
         }
 
         // --- CASE 1: FILE UPLOAD ---
@@ -89,13 +86,25 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, type: 'upload' });
         } 
         
-        // --- CASE 2: CHAT MESSAGE OR JSON WEBHOOK ---
+        // --- CASE 2: CHAT MESSAGE ---
         const rawContent = buffer.toString('utf-8');
         
+        // Try to parse JSON to ensure it's valid, but store string
+        let contentToStore = rawContent;
+        try {
+            const json = JSON.parse(rawContent);
+            // If it's our own chat format
+            if (json.type === 'chat_message') {
+                contentToStore = JSON.stringify(json);
+            }
+        } catch (e) {
+            // It's just a string, keep as is
+        }
+
         const { error: dbError } = await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
-            content: rawContent,
+            content: contentToStore,
             name: channelId,
             headers: JSON.stringify({ ip })
         }]);
@@ -104,12 +113,12 @@ module.exports = async (req, res) => {
         return res.status(200).json({ success: true, type: 'message' });
 
     } catch (error) {
-        console.error("Critical Error:", error);
-        return res.status(500).json({ error: error.message, details: "Check server logs" });
+        console.error("Handler Error:", error);
+        return res.status(500).json({ error: error.message });
     }
 };
 
-// Export config for Vercel (CommonJS style)
+// Vercel Config: Disable Body Parser
 module.exports.config = {
     api: {
         bodyParser: false,

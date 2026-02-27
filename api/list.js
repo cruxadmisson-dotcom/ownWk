@@ -1,9 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-);
+// --- Helper: Safe Supabase Client ---
+const getSupabase = () => {
+    const url = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+    const key = process.env.SUPABASE_ANON_KEY || 'placeholder';
+    return createClient(url, key);
+};
 
 module.exports = async (req, res) => {
     // Enable CORS
@@ -15,12 +17,19 @@ module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
+        const supabase = getSupabase();
+        
         const { data, error } = await supabase
             .from('events')
             .select('*')
             .order('timestamp', { ascending: true });
 
         if (error) {
+            // Check if it's a URL/Key error
+            if (error.message && error.message.includes("supabaseUrl")) {
+                console.error("Supabase Config Error:", error);
+                return res.status(500).json({ error: "Server Configuration Error: Check Env Vars" });
+            }
             console.error('Supabase error:', error);
             return res.status(500).json({ error: error.message });
         }
