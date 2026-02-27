@@ -107,24 +107,20 @@
     <!-- Channels Sidebar -->
     <div class="channels-sidebar">
         <div class="server-header">
-            ownWk Webhook
+            ownWk Receiver
         </div>
         <div class="channel-list">
-            <div class="channel-category">Text Channels</div>
+            <div class="channel-category">Webhook Channel</div>
             <div class="channel-item active">
                 <i class="fa-solid fa-hashtag"></i>
-                <span>general-feed</span>
-            </div>
-            <div class="channel-item">
-                <i class="fa-solid fa-hashtag"></i>
-                <span>files-only</span>
+                <span>incoming-data</span>
             </div>
         </div>
         <div class="user-panel">
             <div class="user-avatar"></div>
             <div class="user-details">
                 <div class="username">Admin</div>
-                <div class="user-status">Online</div>
+                <div class="user-status">Monitoring...</div>
             </div>
             <i class="fa-solid fa-gear" style="cursor: pointer; opacity: 0.6;"></i>
         </div>
@@ -134,7 +130,7 @@
     <div class="chat-container">
         <div class="chat-header">
             <i class="fa-solid fa-hashtag"></i>
-            <h2>general-feed</h2>
+            <h2>incoming-data</h2>
         </div>
         <div class="chat-messages" id="webhook-list">
             <!-- Messages will be injected here -->
@@ -186,8 +182,8 @@
                 // Clear and render
                 listDiv.innerHTML = `
                     <div class="webhook-welcome">
-                        <h1>Welcome to #general-feed</h1>
-                        <p>This is the start of your private webhook channel. Files and messages will appear here as they are received.</p>
+                        <h1>Welcome to #incoming-data</h1>
+                        <p>This is your private receiver. Any data sent to your webhook link will appear here instantly.</p>
                         <div class="endpoint-box">
                             <span id="webhook-url">${window.location.origin}/api/webhook</span>
                             <i class="fa-solid fa-copy copy-btn" onclick="copyToClipboard('${window.location.origin}/api/webhook')"></i>
