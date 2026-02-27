@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ownWk | Dashboard</title>
+    <title>Discord | #incoming-data</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Emoji Picker Library -->
     <script src="https://cdn.jsdelivr.net/npm/picmo@latest/dist/umd/index.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@picmo/popup-picker@latest/dist/umd/index.js"></script>
     <style>
@@ -19,507 +18,322 @@
             --discord-blue: #5865f2;
             --discord-green: #23a559;
             --discord-header: #ffffff;
-            --discord-item-hover: #35373c;
+            --discord-input: #383a40;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
         body { background-color: var(--discord-darkest); color: var(--discord-text); display: flex; height: 100vh; overflow: hidden; }
 
-        /* Sidebar - Server List */
-        .guilds-sidebar { width: 72px; background-color: var(--discord-darkest); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; border-right: 1px solid rgba(255,255,255,0.05); }
-        .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; position: relative; }
+        /* Left Sidebar - Servers */
+        .guilds-sidebar { width: 72px; background-color: var(--discord-darkest); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; flex-shrink: 0; }
+        .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--discord-text); }
         .guild-icon:hover { border-radius: 30%; background-color: var(--discord-blue); color: white; }
-        .guild-icon.active { border-radius: 30%; background-color: var(--discord-blue); }
-        .guild-icon i { font-size: 20px; }
-        .guild-separator { width: 32px; height: 2px; background-color: var(--discord-dark); border-radius: 1px; }
+        .guild-icon.active { border-radius: 30%; background-color: var(--discord-blue); color: white; }
+        .guild-separator { width: 32px; height: 2px; background-color: var(--discord-dark); border-radius: 1px; margin: 4px 0; }
 
-        /* Sidebar - Channel List */
-        .channels-sidebar { width: 240px; background-color: var(--discord-sidebar); display: flex; flex-direction: column; }
-        .server-header { height: 48px; padding: 0 16px; display: flex; align-items: center; box-shadow: 0 1px 0 rgba(0,0,0,0.2); font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .server-header:hover { background-color: rgba(255,255,255,0.05); }
+        /* Channel Sidebar */
+        .channels-sidebar { width: 240px; background-color: var(--discord-sidebar); display: flex; flex-direction: column; flex-shrink: 0; }
+        .server-header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; color: white; box-shadow: 0 1px 0 rgba(0,0,0,0.2); cursor: pointer; }
         .channel-list { padding: 8px; flex: 1; overflow-y: auto; }
-        .channel-category { padding: 18px 8px 4px 16px; font-size: 12px; font-weight: bold; color: var(--discord-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .channel-category { padding: 18px 8px 4px 8px; font-size: 12px; font-weight: bold; color: var(--discord-muted); text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; }
         .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; }
         .channel-item:hover { background-color: rgba(255,255,255,0.05); color: var(--discord-text); }
         .channel-item.active { background-color: rgba(255,255,255,0.1); color: white; }
         .channel-item i { font-size: 18px; opacity: 0.6; }
 
-        /* User Info (Bottom of Sidebar) */
+        /* User Panel */
         .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
-        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background-color: var(--discord-blue); position: relative; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background-color: #5865f2; position: relative; }
         .user-avatar::after { content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background-color: var(--discord-green); border: 2px solid #232428; }
         .user-details { flex: 1; min-width: 0; }
-        .username { font-size: 14px; font-weight: bold; color: white; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .username { font-size: 14px; font-weight: bold; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .user-status { font-size: 12px; color: var(--discord-muted); }
 
         /* Main Chat Area */
-        .chat-container { flex: 1; display: flex; flex-direction: column; background-color: var(--discord-dark); }
-        .chat-header { height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+        .chat-container { flex: 1; display: flex; flex-direction: column; background-color: var(--discord-dark); min-width: 0; }
+        .chat-header { height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 0 rgba(0,0,0,0.2); flex-shrink: 0; }
         .chat-header i { color: var(--discord-muted); font-size: 20px; }
         .chat-header h2 { font-size: 16px; color: white; }
-        .chat-messages { flex: 1; overflow-y: auto; padding: 16px 0; }
+
+        .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; }
+
+        /* Welcome Section (Match Screenshot) */
+        .welcome-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .welcome-hash { width: 68px; height: 68px; background-color: #41434a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 42px; color: white; margin-bottom: 16px; }
+        .welcome-title { font-size: 32px; font-weight: 800; color: white; margin-bottom: 8px; }
+        .welcome-subtitle { color: var(--discord-muted); font-size: 16px; margin-bottom: 16px; }
+        .edit-channel-btn { background-color: #4e5058; color: white; border: none; padding: 6px 16px; border-radius: 3px; font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; }
+        .edit-channel-btn:hover { background-color: #6d6f78; }
 
         /* Message Styling */
-        .message { padding: 2px 16px; margin-top: 1.0625rem; display: flex; gap: 16px; }
+        .message { display: flex; gap: 16px; padding: 2px 16px; margin-top: 1.0625rem; }
         .message:hover { background-color: rgba(0,0,0,0.05); }
-        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: var(--discord-blue); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; }
         .msg-content { flex: 1; min-width: 0; }
         .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
         .msg-author { font-weight: 500; color: white; cursor: pointer; }
         .msg-author:hover { text-decoration: underline; }
         .msg-timestamp { font-size: 12px; color: var(--discord-muted); }
-        .msg-text { color: var(--discord-text); line-height: 1.375rem; white-space: pre-wrap; word-break: break-all; }
-        
-        /* Attachment/Embed Styling */
-        .attachment { margin-top: 8px; background-color: var(--discord-darker); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 12px; display: flex; align-items: center; gap: 12px; max-width: 400px; }
-        .file-icon { font-size: 24px; color: var(--discord-muted); }
-        .file-info { flex: 1; min-width: 0; }
-        .file-name { color: var(--discord-blue); font-weight: 500; cursor: pointer; text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; }
-        .file-name:hover { text-decoration: underline; }
-        .file-size { font-size: 12px; color: var(--discord-muted); }
-        .download-btn { color: var(--discord-muted); cursor: pointer; transition: 0.2s; }
-        .download-btn:hover { color: white; }
+        .msg-text { color: var(--discord-text); line-height: 1.375rem; white-space: pre-wrap; word-wrap: break-word; }
 
-        /* Media Previews */
-        .media-preview { margin-top: 8px; border-radius: 8px; overflow: hidden; max-width: 400px; border: 1px solid rgba(255,255,255,0.05); }
-        .media-preview img, .media-preview video { width: 100%; display: block; }
+        /* Media & Attachments */
+        .attachment-box { margin-top: 8px; background-color: var(--discord-darker); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 12px; display: flex; align-items: center; gap: 12px; max-width: 400px; }
+        .media-preview { margin-top: 8px; border-radius: 8px; overflow: hidden; max-width: 550px; border: 1px solid rgba(255,255,255,0.05); }
+        .media-preview img, .media-preview video { max-width: 100%; display: block; max-height: 400px; }
 
-        /* Webhook Info Card (Top of chat) */
-        .webhook-welcome { padding: 16px; margin: 16px; background-color: var(--discord-darker); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
-        .webhook-welcome h1 { font-size: 24px; color: white; margin-bottom: 8px; }
-        .webhook-welcome p { color: var(--discord-muted); font-size: 14px; margin-bottom: 12px; }
-        .endpoint-box { background: var(--discord-darkest); padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 13px; color: var(--discord-green); display: flex; justify-content: space-between; align-items: center; }
-        .copy-btn { cursor: pointer; color: var(--discord-muted); }
-        .copy-btn:hover { color: white; }
+        /* Chat Input */
+        .chat-input-area { padding: 0 16px 24px 16px; flex-shrink: 0; }
+        .input-wrapper { background-color: var(--discord-input); border-radius: 8px; display: flex; align-items: center; padding: 0 16px; min-height: 44px; position: relative; }
+        .plus-btn { font-size: 20px; color: var(--discord-muted); cursor: pointer; margin-right: 16px; transition: 0.2s; }
+        .plus-btn:hover { color: var(--discord-text); }
+        .main-input { flex: 1; background: transparent; border: none; color: var(--discord-text); font-size: 16px; outline: none; padding: 11px 0; }
+        .input-icons { display: flex; gap: 16px; color: var(--discord-muted); font-size: 20px; }
+        .input-icons i { cursor: pointer; transition: 0.2s; }
+        .input-icons i:hover { color: var(--discord-text); }
+
+        /* Floating Menus */
+        .upload-menu { position: absolute; bottom: 60px; left: 0; background-color: #111214; border-radius: 8px; padding: 8px; display: none; flex-direction: column; width: 200px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); z-index: 100; }
+        .menu-item { padding: 8px 12px; border-radius: 4px; display: flex; align-items: center; gap: 12px; color: var(--discord-text); font-size: 14px; cursor: pointer; }
+        .menu-item:hover { background-color: var(--discord-blue); color: white; }
+        .emoji-picker-pop { position: absolute; bottom: 60px; right: 0; z-index: 100; display: none; }
 
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--discord-darkest); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #1a1b1e; }
-
-        /* Message Input Area */
-        .chat-input-container {
-            padding: 0 16px 24px 16px;
-            background-color: var(--discord-dark);
-        }
-        .chat-input-wrapper {
-            background-color: #383a40;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            height: 44px;
-        }
-        .chat-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--discord-text);
-            font-size: 16px;
-            outline: none;
-        }
-        .chat-input::placeholder {
-            color: var(--discord-muted);
-        }
-        .chat-input-icons {
-            display: flex;
-            gap: 16px;
-            color: var(--discord-muted);
-            font-size: 20px;
-        }
-        .chat-input-icons i {
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .chat-input-icons i:hover {
-            color: var(--discord-text);
-        }
-
-        /* Upload Menu */
-        .upload-menu {
-            position: absolute;
-            bottom: 80px;
-            left: 16px;
-            background-color: #111214;
-            border-radius: 8px;
-            padding: 8px;
-            display: none;
-            flex-direction: column;
-            gap: 4px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-            z-index: 1000;
-            width: 200px;
-        }
-        .upload-menu-item {
-            padding: 8px 12px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-            transition: 0.2s;
-            color: var(--discord-text);
-            font-size: 14px;
-        }
-        .upload-menu-item:hover {
-            background-color: var(--discord-blue);
-            color: white;
-        }
-        .upload-menu-item i {
-            width: 16px;
-            text-align: center;
-            opacity: 0.7;
-        }
-
-        /* Emoji Picker Styling */
-        .picker-container {
-            position: absolute;
-            bottom: 80px;
-            right: 16px;
-            z-index: 1000;
-        }
+        ::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <!-- Guilds Sidebar -->
+    <!-- Server Sidebar -->
     <div class="guilds-sidebar">
-        <div class="guild-icon active">
-            <i class="fa-solid fa-house"></i>
-        </div>
+        <div class="guild-icon active"><i class="fa-brands fa-discord" style="font-size: 28px;"></i></div>
         <div class="guild-separator"></div>
-        <div class="guild-icon">
-            <i class="fa-solid fa-plus"></i>
-        </div>
+        <div class="guild-icon">PS</div>
+        <div class="guild-icon"><img src="https://via.placeholder.com/48" style="border-radius: 50%; width: 100%;"></div>
+        <div class="guild-icon"><i class="fa-solid fa-plus"></i></div>
     </div>
 
-    <!-- Channels Sidebar -->
+    <!-- Channel Sidebar -->
     <div class="channels-sidebar">
         <div class="server-header">
-            ownWk Receiver
+            <span>Privat Server</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 14px;"></i>
         </div>
         <div class="channel-list">
-            <div class="channel-category">Webhook Channel</div>
-            <div class="channel-item active">
-                <i class="fa-solid fa-hashtag"></i>
-                <span>incoming-data</span>
-            </div>
+            <div class="channel-category">Textkanäle <i class="fa-solid fa-plus" style="font-size: 12px;"></i></div>
+            <div class="channel-item"><i class="fa-solid fa-hashtag"></i> websiten</div>
+            <div class="channel-item"><i class="fa-solid fa-hashtag"></i> kleidungen</div>
+            <div class="channel-item"><i class="fa-solid fa-hashtag"></i> logos</div>
+            <div class="channel-item active"><i class="fa-solid fa-hashtag"></i> andere</div>
         </div>
         <div class="user-panel">
             <div class="user-avatar"></div>
             <div class="user-details">
                 <div class="username">Admin</div>
-                <div class="user-status">v2.0 Live</div>
+                <div class="user-status">Online</div>
             </div>
-            <i class="fa-solid fa-gear" style="cursor: pointer; opacity: 0.6;"></i>
+            <div style="display: flex; gap: 12px; color: var(--discord-muted);">
+                <i class="fa-solid fa-microphone"></i>
+                <i class="fa-solid fa-headphones"></i>
+                <i class="fa-solid fa-gear"></i>
+            </div>
         </div>
     </div>
 
-    <!-- Chat Area -->
+    <!-- Main Chat -->
     <div class="chat-container">
         <div class="chat-header">
             <i class="fa-solid fa-hashtag"></i>
-            <h2>incoming-data</h2>
+            <h2>andere</h2>
         </div>
-        <div class="chat-messages" id="webhook-list">
-            <!-- Messages will be injected here -->
+        
+        <div class="chat-messages" id="chat-feed">
+            <!-- Messages load here -->
+            <div style="color: var(--discord-muted); padding: 20px;">Lade Nachrichten...</div>
         </div>
-        <!-- Chat Input Area -->
-        <div class="chat-input-container">
-            <div class="upload-menu" id="upload-menu">
-                <div class="upload-menu-item" onclick="triggerFileUpload()">
-                    <i class="fa-solid fa-file-arrow-up"></i>
-                    <span>Datei hochladen</span>
+
+        <div class="chat-input-area">
+            <div class="input-wrapper">
+                <div class="upload-menu" id="upload-menu">
+                    <div class="menu-item" onclick="document.getElementById('file-input').click()">
+                        <i class="fa-solid fa-file-arrow-up"></i> Datei hochladen
+                    </div>
+                    <div class="menu-item"><i class="fa-solid fa-square-poll-horizontal"></i> Umfrage erstellen</div>
                 </div>
-                <div class="upload-menu-item">
-                    <i class="fa-solid fa-square-poll-horizontal"></i>
-                    <span>Umfrage erstellen</span>
-                </div>
-                <div class="upload-menu-item">
-                    <i class="fa-solid fa-shapes"></i>
-                    <span>Verwende Apps</span>
-                </div>
-            </div>
-            <div id="emoji-picker-container" class="picker-container"></div>
-            
-            <div class="chat-input-wrapper">
-                <i class="fa-solid fa-circle-plus" id="upload-btn" style="margin-right: 16px; color: var(--discord-muted); cursor: pointer; font-size: 20px;"></i>
-                <input type="text" class="chat-input" id="message-input" placeholder="Message #incoming-data">
-                <input type="file" id="hidden-file-input" style="display: none;" onchange="handleManualUpload(this)">
-                <div class="chat-input-icons">
+                <i class="fa-solid fa-circle-plus plus-btn" id="plus-btn"></i>
+                <input type="text" class="main-input" id="chat-input" placeholder="Nachricht an #andere">
+                <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(this)">
+                
+                <div class="input-icons">
                     <i class="fa-solid fa-gift"></i>
                     <i class="fa-solid fa-bolt"></i>
                     <i class="fa-solid fa-note-sticky"></i>
                     <i class="fa-solid fa-face-smile" id="emoji-btn"></i>
-                    <i class="fa-solid fa-square-plus"></i>
                 </div>
+                <div class="emoji-picker-pop" id="emoji-picker"></div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE_URL = window.location.origin + '/api'; 
-        
-        async function copyToClipboard(text) {
+        const API_BASE_URL = window.location.origin + '/api';
+        const chatFeed = document.getElementById('chat-feed');
+        const chatInput = document.getElementById('chat-input');
+
+        // Initial Load
+        window.onload = () => {
+            refreshChat();
+            setInterval(refreshChat, 4000);
+
+            // Setup Enter Key
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+
+            // Setup Menus
+            const plusBtn = document.getElementById('plus-btn');
+            const uploadMenu = document.getElementById('upload-menu');
+            plusBtn.onclick = (e) => {
+                e.stopPropagation();
+                uploadMenu.style.display = uploadMenu.style.display === 'flex' ? 'none' : 'flex';
+            };
+
+            const emojiBtn = document.getElementById('emoji-btn');
+            const emojiPicker = document.getElementById('emoji-picker');
+            const picker = picmo.createPicker({ rootElement: emojiPicker });
+            
+            emojiBtn.onclick = (e) => {
+                e.stopPropagation();
+                emojiPicker.style.display = emojiPicker.style.display === 'block' ? 'none' : 'block';
+            };
+
+            picker.addEventListener('emoji:select', (selection) => {
+                chatInput.value += selection.emoji;
+                emojiPicker.style.display = 'none';
+                chatInput.focus();
+            });
+
+            document.onclick = () => {
+                uploadMenu.style.display = 'none';
+                emojiPicker.style.display = 'none';
+            };
+        };
+
+        async function refreshChat() {
             try {
-                await navigator.clipboard.writeText(text);
-                alert('Copied to clipboard!');
+                const res = await fetch(`${API_BASE_URL}/list`);
+                if (!res.ok) return;
+                const data = await res.json();
+                renderMessages(data);
             } catch (err) {
-                console.error('Failed to copy: ', err);
+                console.error("Fetch error:", err);
             }
         }
 
-        async function loadWebhooks() {
-            const listDiv = document.getElementById('webhook-list');
-            if (!listDiv) {
-                console.error("Critical: 'webhook-list' element not found!");
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/list`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
+        function renderMessages(data) {
+            let html = `
+                <div class="welcome-section">
+                    <div class="welcome-hash">#</div>
+                    <h1 class="welcome-title">Willkommen bei #andere!</h1>
+                    <p class="welcome-subtitle">Das ist der Beginn des Kanals #andere.</p>
+                    <button class="edit-channel-btn"><i class="fa-solid fa-pencil" style="font-size: 12px; margin-right: 6px;"></i> Kanal bearbeiten</button>
+                </div>
+            `;
+
+            data.forEach(item => {
+                const ts = new Date(item.timestamp);
+                const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateStr = ts.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' });
                 
-                let combinedFeed = [];
+                const headers = typeof item.headers === 'string' ? JSON.parse(item.headers) : (item.headers || {});
+                const ip = headers.ip || '';
+                
+                let author = 'Webhook';
+                let content = item.content;
+                let avatarColor = '#23a559';
+                let avatarInitial = 'W';
+                let isMedia = false;
 
-                if (data.webhooks) {
-                    data.webhooks.forEach(webhook => {
-                        let content = webhook.body;
-                        let author = 'Webhook';
-                        let isChat = false;
-
-                        try {
-                            const parsed = JSON.parse(webhook.body);
-                            if (parsed.type === 'chat_message') {
-                                content = parsed.content;
-                                author = parsed.author || 'Admin';
-                                isChat = true;
-                            }
-                        } catch (e) {}
-
-                        combinedFeed.push({
-                            type: isChat ? 'chat' : 'webhook',
-                            timestamp: webhook.timestamp,
-                            content: content,
-                            author: author,
-                            headers: typeof webhook.headers === 'string' ? JSON.parse(webhook.headers) : webhook.headers
-                        });
-                    });
+                if (item.type === 'upload') {
+                    author = 'File Bot';
+                    avatarColor = '#f57731';
+                    avatarInitial = 'F';
+                    const isImg = item.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                    const isVid = item.name.match(/\.(mp4|webm|mov)$/i);
+                    
+                    content = `
+                        <div class="attachment-box">
+                            <i class="fa-solid fa-file-zipper" style="font-size: 24px; color: var(--discord-muted);"></i>
+                            <div style="flex:1">
+                                <a href="${item.path}" target="_blank" style="color: #00a8fc; text-decoration: none; font-weight: 500;">${item.name}</a>
+                                <div style="font-size: 12px; color: var(--discord-muted);">${(item.size/1024).toFixed(1)} KB</div>
+                            </div>
+                            <a href="${item.path}" download style="color: var(--discord-muted);"><i class="fa-solid fa-download"></i></a>
+                        </div>
+                    `;
+                    if (isImg) content += `<div class="media-preview"><img src="${item.path}"></div>`;
+                    if (isVid) content += `<div class="media-preview"><video src="${item.path}" controls></video></div>`;
+                } else {
+                    try {
+                        const parsed = JSON.parse(item.content);
+                        if (parsed.type === 'chat_message') {
+                            author = parsed.author || 'Admin';
+                            content = parsed.content;
+                            avatarColor = '#5865f2';
+                            avatarInitial = author[0].toUpperCase();
+                        }
+                    } catch(e) {}
                 }
 
-                if (data.uploads) {
-                    data.uploads.forEach(upload => {
-                        combinedFeed.push({
-                            type: 'upload',
-                            timestamp: upload.time,
-                            name: upload.name,
-                            size: upload.size,
-                            path: upload.path,
-                            author: 'File Bot',
-                            headers: typeof upload.headers === 'string' ? JSON.parse(upload.headers) : upload.headers
-                        });
-                    });
-                }
-
-                // Sort oldest to newest
-                combinedFeed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-                // Always start with welcome message
-                let html = `
-                    <div class="webhook-welcome">
-                        <h1>Welcome to #incoming-data</h1>
-                        <p>This is your private receiver. Any data sent to your webhook link will appear here instantly.</p>
-                        <div class="endpoint-box">
-                            <span id="webhook-url">${window.location.origin}/api/webhook</span>
-                            <i class="fa-solid fa-copy copy-btn" onclick="copyToClipboard('${window.location.origin}/api/webhook')"></i>
+                html += `
+                    <div class="message">
+                        <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
+                        <div class="msg-content">
+                            <div class="msg-header">
+                                <span class="msg-author">${author} ${ip ? `[${ip}]` : ''}</span>
+                                <span class="msg-timestamp">${dateStr} ${timeStr}</span>
+                            </div>
+                            <div class="msg-text">${content}</div>
                         </div>
                     </div>
                 `;
+            });
 
-                combinedFeed.forEach(item => {
-                    const timestamp = new Date(item.timestamp);
-                    const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const dateString = timestamp.toLocaleDateString();
-                    
-                    let contentHtml = '';
-                    let authorName = item.author || 'Webhook';
-                    let avatarInitial = authorName[0].toUpperCase();
-                    let avatarColor = '#5865f2';
-                    const ip = item.headers ? (item.headers.ip || '') : '';
-                    const displayAuthor = ip ? `${authorName} [${ip}]` : authorName;
-
-                    if (item.type === 'chat') {
-                        avatarColor = '#5865f2';
-                        contentHtml = `<div class="msg-text">${item.content}</div>`;
-                    } else if (item.type === 'webhook') {
-                        avatarColor = '#23a559';
-                        contentHtml = `<div class="msg-text"><pre style="background: rgba(0,0,0,0.2); border: none; padding: 8px; border-radius: 4px; overflow-x: auto;">${item.content}</pre></div>`;
-                    } else if (item.type === 'upload') {
-                        avatarColor = '#f57731';
-                        const isArchive = item.name.endsWith('.zip') || item.name.endsWith('.rar') || item.name.endsWith('.7z');
-                        const isImage = item.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                        const isVideo = item.name.match(/\.(mp4|webm|mov)$/i);
-                        const iconClass = isArchive ? 'fa-file-archive' : 'fa-file';
-                        
-                        let mediaHtml = '';
-                        if (isImage) {
-                            mediaHtml = `<div class="media-preview"><img src="${item.path}" style="max-width: 100%; border-radius: 4px; margin-top: 8px;"></div>`;
-                        } else if (isVideo) {
-                            mediaHtml = `<div class="media-preview"><video src="${item.path}" controls style="max-width: 100%; border-radius: 4px; margin-top: 8px;"></video></div>`;
-                        }
-
-                        contentHtml = `
-                            <div class="msg-text">Sent an attachment:</div>
-                            <div class="attachment">
-                                <i class="fa-solid ${iconClass} file-icon"></i>
-                                <div class="file-info">
-                                    <a href="${item.path}" target="_blank" class="file-name">${item.name}</a>
-                                    <div class="file-size">${(item.size / 1024).toFixed(2)} KB</div>
-                                </div>
-                                <a href="${item.path}" download="${item.name}" class="download-btn">
-                                    <i class="fa-solid fa-download"></i>
-                                </a>
-                            </div>
-                            ${mediaHtml}
-                        `;
-                    }
-
-                    html += `
-                        <div class="message">
-                            <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
-                            <div class="msg-content">
-                                <div class="msg-header">
-                                    <span class="msg-author">${displayAuthor}</span>
-                                    <span class="msg-timestamp">${dateString} at ${timeString}</span>
-                                </div>
-                                ${contentHtml}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                listDiv.innerHTML = html;
-                listDiv.scrollTop = listDiv.scrollHeight;
-
-            } catch (error) {
-                console.error('Error loading data:', error);
-            }
+            const shouldScroll = chatFeed.scrollTop + chatFeed.clientHeight >= chatFeed.scrollHeight - 50;
+            chatFeed.innerHTML = html;
+            if (shouldScroll) chatFeed.scrollTop = chatFeed.scrollHeight;
         }
 
-        window.onload = () => {
-            loadWebhooks();
-            setInterval(loadWebhooks, 5000); // Live refresh
-
-            // Add listener for message input
-            const messageInput = document.getElementById('message-input');
-            messageInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-
-            // --- Upload Menu Toggle ---
-            const uploadBtn = document.getElementById('upload-btn');
-            const uploadMenu = document.getElementById('upload-menu');
-            uploadBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                uploadMenu.style.display = uploadMenu.style.display === 'flex' ? 'none' : 'flex';
-            });
-
-            // --- Emoji Picker ---
-            const emojiBtn = document.getElementById('emoji-btn');
-            const pickerContainer = document.getElementById('emoji-picker-container');
+        async function sendChatMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            chatInput.value = '';
             
-            // Using Picmo Emoji Picker
-            const picker = picmo.createPicker({
-                rootElement: pickerContainer
+            await fetch(`${API_BASE_URL}/webhook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'chat_message', content: text, author: 'Admin' })
             });
-
-            pickerContainer.style.display = 'none';
-
-            emojiBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                pickerContainer.style.display = pickerContainer.style.display === 'none' ? 'block' : 'none';
-            });
-
-            picker.addEventListener('emoji:select', (event) => {
-                messageInput.value += event.emoji;
-                pickerContainer.style.display = 'none';
-                messageInput.focus();
-            });
-
-            // Close menus on click outside
-            document.addEventListener('click', () => {
-                uploadMenu.style.display = 'none';
-                pickerContainer.style.display = 'none';
-            });
-        };
-
-        function triggerFileUpload() {
-            document.getElementById('hidden-file-input').click();
+            refreshChat();
         }
 
-        async function handleManualUpload(input) {
-            if (input.files.length === 0) return;
-            
+        async function handleFileUpload(input) {
+            if (!input.files[0]) return;
             const file = input.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                // We reuse our webhook endpoint for manual uploads too
-                const response = await fetch(`${API_BASE_URL}/webhook`, {
-                    method: 'POST',
-                    headers: {
-                        'X-File-Name': file.name
-                    },
-                    body: file // Send as direct stream for our refined logic
-                });
-
-                if (response.ok) {
-                    loadWebhooks();
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-            }
-            input.value = ''; // Reset
+            await fetch(`${API_BASE_URL}/webhook`, {
+                method: 'POST',
+                headers: { 'X-File-Name': file.name },
+                body: file
+            });
+            refreshChat();
         }
 
-        async function sendMessage() {
-            const input = document.getElementById('message-input');
-            const message = input.value.trim();
-            if (!message) return;
-
-            // 1. Sofort leeren für das Discord-Feeling
-            input.value = '';
-            input.focus();
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/webhook`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        type: 'chat_message',
-                        content: message,
-                        author: 'Admin'
-                    })
-                });
-
-                if (response.ok) {
-                    // 2. Liste im Hintergrund aktualisieren
-                    await loadWebhooks();
-                } else {
-                    console.error('Failed to send message');
-                    // Optional: Nachricht wieder einsetzen bei Fehler
-                    // input.value = message;
-                }
-            } catch (error) {
-                console.error('Error sending message:', error);
-            }
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            alert("Webhook-URL kopiert!");
         }
     </script>
 </body>

@@ -21,30 +21,15 @@ module.exports = async (req, res) => {
         const { data, error } = await supabase
             .from('events')
             .select('*')
-            .order('timestamp', { ascending: false });
+            .order('timestamp', { ascending: true }); // Chronological order
 
         if (error) {
             console.error('Database Error:', error);
             return res.status(500).json({ error: 'Database Error' });
         }
 
-        const webhooks = data.filter(item => item.type === 'webhook').map(item => ({
-            timestamp: item.timestamp,
-            body: item.content,
-            headers: JSON.parse(item.headers || '{}')
-        }));
-
-        const uploads = data.filter(item => item.type === 'upload').map(item => ({
-            name: item.name,
-            size: item.size,
-            time: item.timestamp,
-            path: item.path
-        }));
-
-        res.status(200).json({
-            webhooks,
-            uploads
-        });
+        // Send raw data, frontend will handle filtering/mapping
+        res.status(200).json(data);
     } catch (error) {
         console.error('Server error:', error);
         res.status(500).json({ error: 'Internal Server Error' });
