@@ -300,8 +300,14 @@
                 if (contentType && contentType.includes("application/json")) {
                     result = await response.json();
                 } else {
-                    const text = await response.text();
-                    result = { error: text || "Unbekannter Server-Fehler" };
+                    const errorText = await response.text();
+                    console.error("Server returned non-JSON:", errorText);
+                    // Extract error from Vercel's HTML error page if possible
+                    if (errorText.includes("FUNCTION_INVOCATION_FAILED")) {
+                        result = { error: "Server-Funktion abgestürzt. Bitte warte 1 Min und versuche es erneut." };
+                    } else {
+                        result = { error: "Server-Fehler (Status " + response.status + ")" };
+                    }
                 }
                 
                 if (!response.ok) {

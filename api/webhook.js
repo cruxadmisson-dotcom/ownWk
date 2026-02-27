@@ -5,46 +5,58 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
+// Helper to get raw body from request
 const getRawBody = async (req) => {
-    return new Promise((resolve, reject) => {
-        const chunks = [];
-        req.on('data', chunk => chunks.push(chunk));
-        req.on('end', () => resolve(Buffer.concat(chunks)));
-        req.on('error', err => reject(err));
-    });
+    const chunks = [];
+    for await (const chunk of req) {
+        chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
 };
 
-module.exports = async (req, res) => {
-    res.setHeader('Access-Control-Allow-Credentials', true);
+// Main handler function
+async function handler(req, res) {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-File-Name, X-Channel-Id');
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
 
     const timestamp = new Date().toISOString();
     const contentType = req.headers['content-type'] || '';
     const fileName = req.headers['x-file-name'];
     const channelId = req.headers['x-channel-id'] || 'andere';
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
 
     try {
         const buffer = await getRawBody(req);
         
         if (!buffer || buffer.length === 0) {
-            return res.status(400).json({ error: "Empty request body" });
+            return res.status(400).json({ error: 'Empty body' });
         }
 
+        // --- CASE 1: FILE UPLOAD ---
         if (fileName || contentType.includes('application/octet-stream')) {
             const safeFileName = `${Date.now()}_${fileName || 'file'}`;
+            
             const { error: storageError } = await supabase.storage
                 .from('uploads')
-                .upload(safeFileName, buffer, { contentType: contentType || 'application/octet-stream' });
+                .upload(safeFileName, buffer, { 
+                    contentType: contentType || 'application/octet-stream',
+                    upsert: false
+                });
 
             if (storageError) throw storageError;
 
-            const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(safeFileName);
+            const publicUrl = supabase.storage.from('uploads').getPublicUrl(safeFileName).data.publicUrl;
 
             const { error: dbError } = await supabase.from('events').insert([{
                 type: 'upload',
@@ -60,22 +72,29 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true });
         } 
         
-        const rawContent = buffer.toString('utf-8');
+        // --- CASE 2: WEBHOOK OR CHAT MESSAGE ---
+        const content = buffer.toString('utf-8');
         const { error: dbError } = await supabase.from('events').insert([{
             type: 'webhook',
             timestamp,
-            content: rawContent,
+            content: content,
             name: channelId,
             headers: JSON.stringify({ ip })
         }]);
 
         if (dbError) throw dbError;
         return res.status(200).json({ success: true });
+
     } catch (error) {
         console.error("Webhook Error:", error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
-};
+}
 
-// Vercel config needs to be exported separately if using module.exports
-module.exports.config = { api: { bodyParser: false } };
+// Export the handler and the config separately for Vercel
+module.exports = handler;
+module.exports.config = {
+    api: {
+        bodyParser: false,
+    },
+};
