@@ -90,6 +90,44 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--discord-darkest); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #1a1b1e; }
+
+        /* Message Input Area */
+        .chat-input-container {
+            padding: 0 16px 24px 16px;
+            background-color: var(--discord-dark);
+        }
+        .chat-input-wrapper {
+            background-color: #383a40;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            height: 44px;
+        }
+        .chat-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--discord-text);
+            font-size: 16px;
+            outline: none;
+        }
+        .chat-input::placeholder {
+            color: var(--discord-muted);
+        }
+        .chat-input-icons {
+            display: flex;
+            gap: 16px;
+            color: var(--discord-muted);
+            font-size: 20px;
+        }
+        .chat-input-icons i {
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .chat-input-icons i:hover {
+            color: var(--discord-text);
+        }
     </style>
 </head>
 <body>
@@ -134,6 +172,17 @@
         </div>
         <div class="chat-messages" id="webhook-list">
             <!-- Messages will be injected here -->
+        </div>
+        <!-- Chat Input Area -->
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <i class="fa-solid fa-circle-plus" style="margin-right: 16px; color: var(--discord-muted); cursor: pointer;"></i>
+                <input type="text" class="chat-input" id="message-input" placeholder="Message #incoming-data">
+                <div class="chat-input-icons">
+                    <i class="fa-solid fa-gift"></i>
+                    <i class="fa-solid fa-face-smile"></i>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -197,26 +246,30 @@
 
                     const timestamp = new Date(item.timestamp);
                     const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const dateString = timestamp.toLocaleDateString();
                     
                     let contentHtml = '';
                     let author = 'Webhook';
                     let avatarInitial = 'W';
                     let avatarColor = '#5865f2';
+                    const ip = item.headers ? (item.headers.ip || 'Unknown IP') : 'Unknown IP';
 
                     if (item.type === 'webhook') {
                         avatarInitial = 'M';
-                        author = 'Message Bot';
+                        author = `Message Bot [${ip}]`;
                         avatarColor = '#23a559';
                         contentHtml = `<div class="msg-text">${item.content || '*(Empty body)*'}</div>`;
                     } else if (item.type === 'upload') {
                         avatarInitial = 'F';
-                        author = 'File Bot';
+                        author = `File Bot [${ip}]`;
                         avatarColor = '#f57731';
+                        
+                        const isArchive = item.name.endsWith('.zip') || item.name.endsWith('.rar') || item.name.endsWith('.7z');
+                        const iconClass = isArchive ? 'fa-file-archive' : 'fa-file';
+                        
                         contentHtml = `
                             <div class="msg-text">Sent an attachment:</div>
                             <div class="attachment">
-                                <i class="fa-solid fa-file file-icon"></i>
+                                <i class="fa-solid ${iconClass} file-icon"></i>
                                 <div class="file-info">
                                     <a href="${item.path}" target="_blank" class="file-name">${item.name}</a>
                                     <div class="file-size">${(item.size / 1024).toFixed(2)} KB</div>
@@ -252,7 +305,50 @@
         window.onload = () => {
             loadWebhooks();
             setInterval(loadWebhooks, 5000); // Live refresh
+
+            // Add listener for message input
+            const messageInput = document.getElementById('message-input');
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
         };
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            input.value = '';
+            input.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/webhook`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'chat_message',
+                        content: message,
+                        author: 'Admin'
+                    })
+                });
+
+                if (response.ok) {
+                    loadWebhooks();
+                } else {
+                    console.error('Failed to send message');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+            } finally {
+                input.disabled = false;
+                input.focus();
+            }
+        }
     </script>
 </body>
 </html>

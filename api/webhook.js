@@ -34,6 +34,7 @@ module.exports = async (req, res) => {
     const timestamp = new Date().toISOString();
     const contentType = req.headers['content-type'] || '';
     const fileName = req.headers['x-file-name'] || `file_${Date.now()}`;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
         // If it's a direct file stream (octet-stream) or we have a file name header
@@ -60,7 +61,8 @@ module.exports = async (req, res) => {
                 timestamp,
                 name: fileName,
                 size: buffer.length,
-                path: publicUrl
+                path: publicUrl,
+                headers: JSON.stringify({ ...req.headers, ip: ip }) // Store IP in headers
             }]);
 
             return res.status(200).send('File received and saved');
@@ -82,7 +84,7 @@ module.exports = async (req, res) => {
             type: 'webhook',
             timestamp,
             content: content,
-            headers: JSON.stringify(req.headers)
+            headers: JSON.stringify({ ...req.headers, ip: ip }) // Store IP in headers
         }]);
 
         res.status(200).send('Data received and saved');
