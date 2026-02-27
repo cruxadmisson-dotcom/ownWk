@@ -208,12 +208,29 @@
                 let combinedFeed = [];
 
                 if (data.webhooks) {
-                    combinedFeed = combinedFeed.concat(data.webhooks.map(webhook => ({
-                        type: 'webhook',
-                        timestamp: webhook.timestamp,
-                        content: webhook.body,
-                        headers: webhook.headers
-                    })));
+                    combinedFeed = combinedFeed.concat(data.webhooks.map(webhook => {
+                        // Handle both raw strings and JSON from our 'events' table
+                        let content = webhook.body;
+                        let author = 'Webhook';
+                        let isChat = false;
+
+                        try {
+                            const parsed = JSON.parse(webhook.body);
+                            if (parsed.type === 'chat_message') {
+                                content = parsed.content;
+                                author = parsed.author || 'Admin';
+                                isChat = true;
+                            }
+                        } catch (e) {}
+
+                        return {
+                            type: isChat ? 'chat' : 'webhook',
+                            timestamp: webhook.timestamp,
+                            content: content,
+                            author: author,
+                            headers: webhook.headers
+                        };
+                    }));
                 }
 
                 if (data.uploads) {
@@ -222,10 +239,12 @@
                         timestamp: upload.time,
                         name: upload.name,
                         size: upload.size,
-                        path: upload.path
+                        path: upload.path,
+                        author: 'File Bot'
                     })));
                 }
 
+                // Sort by time ASCENDING (oldest top, newest bottom like Discord)
                 combinedFeed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
                 // Clear and render
@@ -246,23 +265,23 @@
 
                     const timestamp = new Date(item.timestamp);
                     const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const dateString = timestamp.toLocaleDateString();
                     
                     let contentHtml = '';
-                    let author = 'Webhook';
-                    let avatarInitial = 'W';
+                    let authorName = item.author || 'Webhook';
+                    let avatarInitial = authorName[0].toUpperCase();
                     let avatarColor = '#5865f2';
-                    const ip = item.headers ? (item.headers.ip || 'Unknown IP') : 'Unknown IP';
+                    const ip = item.headers ? (item.headers.ip || '') : '';
+                    const displayAuthor = ip ? `${authorName} [${ip}]` : authorName;
 
-                    if (item.type === 'webhook') {
-                        avatarInitial = 'M';
-                        author = `Message Bot [${ip}]`;
+                    if (item.type === 'chat') {
+                        avatarColor = '#5865f2';
+                        contentHtml = `<div class="msg-text">${item.content}</div>`;
+                    } else if (item.type === 'webhook') {
                         avatarColor = '#23a559';
-                        contentHtml = `<div class="msg-text">${item.content || '*(Empty body)*'}</div>`;
+                        contentHtml = `<div class="msg-text"><pre style="background: rgba(0,0,0,0.2); border: none; padding: 8px;">${item.content}</pre></div>`;
                     } else if (item.type === 'upload') {
-                        avatarInitial = 'F';
-                        author = `File Bot [${ip}]`;
                         avatarColor = '#f57731';
-                        
                         const isArchive = item.name.endsWith('.zip') || item.name.endsWith('.rar') || item.name.endsWith('.7z');
                         const iconClass = isArchive ? 'fa-file-archive' : 'fa-file';
                         
@@ -285,8 +304,8 @@
                         <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
                         <div class="msg-content">
                             <div class="msg-header">
-                                <span class="msg-author">${author}</span>
-                                <span class="msg-timestamp">Today at ${timeString}</span>
+                                <span class="msg-author">${displayAuthor}</span>
+                                <span class="msg-timestamp">${dateString} at ${timeString}</span>
                             </div>
                             ${contentHtml}
                         </div>
