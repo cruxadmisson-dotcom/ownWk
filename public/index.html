@@ -729,10 +729,61 @@
             if (!text) return '';
             
             // Helper to extract info from markdown-like syntax: ![type:name|size](data)
+            // Or new syntax: ![type:name|size](file://fileId)
             const parseMedia = (str, type) => {
-                const regex = new RegExp(`!\\[${type}:(.*?)\\|(.*?)\\]\\((data:.*?)\\)`, 'g');
+                const regex = new RegExp(`!\\[${type}:(.*?)\\|(.*?)\\]\\((.*?)\\)`, 'g');
                 return str.replace(regex, (match, name, size, data) => {
-                    const downloadAttr = `href="${data}" download="${name}"`;
+                    let downloadAttr = '';
+                    let isFileProtocol = data.startsWith('file://');
+                    let fileId = isFileProtocol ? data.replace('file://', '') : null;
+                    
+                    if (isFileProtocol) {
+                        // Use a placeholder ID to lazy load
+                        const elementId = `media-${fileId}-${Math.random().toString(36).substr(2, 9)}`;
+                        
+                        // Trigger lazy load
+                        setTimeout(() => loadFileContent(fileId, elementId, type, name), 10);
+                        
+                        if (type === 'image') {
+                            return `
+                                <div class="media-wrapper">
+                                    <img id="${elementId}" src="" alt="Loading..." style="min-height: 100px; background: #2f3136;">
+                                    <a id="dl-${elementId}" class="media-download-btn" title="Download"><i class="fa-solid fa-download"></i></a>
+                                </div>
+                            `;
+                        }
+                        if (type === 'video') {
+                            return `
+                                <div class="media-wrapper">
+                                    <video id="${elementId}" controls style="min-height: 100px; background: #2f3136;"></video>
+                                    <a id="dl-${elementId}" class="media-download-btn" title="Download"><i class="fa-solid fa-download"></i></a>
+                                </div>
+                            `;
+                        }
+                        if (type === 'file') {
+                            // Extract extension for icon styling
+                            const ext = name.split('.').pop().toLowerCase();
+                            let iconClass = 'fa-file';
+                            if (['exe', 'msi', 'bat'].includes(ext)) iconClass = 'fa-file-code exe';
+                            else if (['zip', 'rar', '7z', 'tar'].includes(ext)) iconClass = 'fa-file-zipper zip';
+                            else if (['pdf'].includes(ext)) iconClass = 'fa-file-pdf pdf';
+                            else if (['txt', 'md', 'log'].includes(ext)) iconClass = 'fa-file-lines txt';
+                            else if (['mp3', 'wav', 'ogg'].includes(ext)) iconClass = 'fa-file-audio';
+
+                            return `
+                                <div class="file-attachment">
+                                    <div class="file-icon"><i class="fa-solid ${iconClass}"></i></div>
+                                    <div class="file-info">
+                                        <a id="${elementId}" class="file-name" title="${name}">${name}</a>
+                                        <div class="file-size">${size.replace('.', ',')}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    // Old data: URI behavior
+                    downloadAttr = `href="${data}" download="${name}"`;
                     
                     if (type === 'image') {
                         return `
@@ -751,9 +802,14 @@
                         `;
                     }
                     if (type === 'file') {
+                        const ext = name.split('.').pop().toLowerCase();
+                        let iconClass = 'fa-file';
+                        if (['exe', 'msi', 'bat'].includes(ext)) iconClass = 'fa-file-code exe';
+                        else if (['zip', 'rar', '7z', 'tar'].includes(ext)) iconClass = 'fa-file-zipper zip';
+                        
                         return `
                             <div class="file-attachment">
-                                <div class="file-icon"><i class="fa-solid fa-file"></i></div>
+                                <div class="file-icon"><i class="fa-solid ${iconClass}"></i></div>
                                 <div class="file-info">
                                     <a ${downloadAttr} class="file-name" title="${name}">${name}</a>
                                     <div class="file-size">${size.replace('.', ',')}</div>
@@ -780,6 +836,92 @@
             formatted = formatted.replace(/(?<!src="|src='|href="|href='|\()((https?):\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#00a8fc;">$1</a>');
             
             return formatted;
+        }
+
+        // Helper function to lazy load file content
+        async function loadFileContent(fileId, elementId, type, filename) {
+            try {
+                // Fetch chunks
+                // Since our API lists messages, we need to filter by header which is tricky with current list API.
+                // We modified API to accept fileId param!
+                
+                const res = await fetch(`${API_BASE_URL}/list?channelId=file_storage&fileId=${fileId}&limit=1000`);
+                if (!res.ok) throw new Error("Load failed");
+                
+                const chunks = await res.json();
+                if (!chunks || chunks.length === 0) return;
+                
+                // Sort chunks by index
+                chunks.sort((a, b) => {
+                    const ha = JSON.parse(a.headers || '{}');
+                    const hb = JSON.parse(b.headers || '{}');
+                    return (ha.index || 0) - (hb.index || 0);
+                });
+                
+                // Stitch base64
+                // Note: content is base64 string "data:...,base64,..." or just raw base64?
+                // Our uploader sends "data:..." URL usually.
+                // Wait, uploader sends: `content: base64Chunk` where base64Chunk comes from FileReader.readAsDataURL
+                // So it includes "data:application/octet-stream;base64,..." header for first chunk?
+                // No, readAsDataURL includes it for every slice? No.
+                // FileReader.readAsDataURL(blob) returns a data URL.
+                // If we slice a file, it's a blob. readAsDataURL(slice) returns data:application/octet-stream;base64,...
+                // So EACH chunk has a header. We need to strip it except for the first one?
+                // Actually, stitching data URIs is invalid. We need raw base64.
+                
+                // FIX: Uploader should send raw bytes or we strip header here.
+                // Data URL format: "data:[<mediatype>][;base64],<data>"
+                
+                let combinedBase64 = '';
+                let mimeType = '';
+                
+                chunks.forEach((chunk, i) => {
+                    let data = chunk.content;
+                    if (data.startsWith('data:')) {
+                        const commaIndex = data.indexOf(',');
+                        if (i === 0) {
+                            // Keep header for first chunk? No, better to rebuild blob.
+                            mimeType = data.substring(5, commaIndex).split(';')[0];
+                        }
+                        data = data.substring(commaIndex + 1);
+                    }
+                    combinedBase64 += data;
+                });
+                
+                // Convert base64 to Blob
+                const byteCharacters = atob(combinedBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {type: mimeType || 'application/octet-stream'});
+                const blobUrl = URL.createObjectURL(blob);
+                
+                const el = document.getElementById(elementId);
+                const dl = document.getElementById(`dl-${elementId}`);
+                
+                if (type === 'image' || type === 'video') {
+                    el.src = blobUrl;
+                } else {
+                    // For file, we set the download link href
+                    // The elementId is the anchor tag itself? No, check template.
+                    // <a id="${elementId}" ...>
+                    if (el) {
+                        el.href = blobUrl;
+                        el.download = filename;
+                        // Also trigger click if user just clicked it? No, this is lazy load.
+                    }
+                }
+                
+                if (dl) {
+                    dl.href = blobUrl;
+                    dl.download = filename;
+                }
+                
+            } catch (e) {
+                console.error("File load error", e);
+            }
         }
 
         async function sendChatMessage() {
@@ -826,74 +968,83 @@
         async function handleFileUpload(input) {
             if (!input.files[0]) return;
             const file = input.files[0];
+            const fileId = crypto.randomUUID(); // Unique ID for this file
             
-            // Check size (max 4MB for Vercel/Supabase direct insert safety)
-            if (file.size > 4 * 1024 * 1024) {
-                alert("Datei zu groß (Max 4MB)");
-                input.value = '';
-                return;
-            }
+            // Chunk size: 3MB (safe for Vercel 4.5MB limit)
+            const CHUNK_SIZE = 3 * 1024 * 1024; 
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            
+            // UI Feedback
+            const btn = document.querySelector('.plus-btn');
+            const originalIcon = btn.innerHTML;
+            
+            try {
+                // 1. Upload Chunks
+                for (let i = 0; i < totalChunks; i++) {
+                    btn.innerHTML = `<span style="font-size:10px">${Math.round((i/totalChunks)*100)}%</span>`;
+                    
+                    const start = i * CHUNK_SIZE;
+                    const end = Math.min(file.size, start + CHUNK_SIZE);
+                    const chunk = file.slice(start, end);
+                    
+                    // Convert chunk to base64
+                    const base64Chunk = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(chunk);
+                    });
 
-            // Convert to Base64
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const base64Data = e.target.result;
-                const isImage = file.type.startsWith('image/');
-                
-                // Construct Markdown content
-                let content = ``; // Start empty, media/files handle themselves below
-                
-                // We use structured markdown for formatContent to parse
-                // ![type:filename|size](data:...)
-                
-                let sizeStr = "";
-                const sizeInBytes = file.size;
-                
-                // Force MB for anything above 1MB, KB only for very small files
-                if (sizeInBytes < 1024 * 1024) {
-                    // Under 1 MB -> KB
-                    sizeStr = (sizeInBytes / 1024).toFixed(2).replace('.', ',') + " KB";
-                } else if (sizeInBytes < 1024 * 1024 * 1024) {
-                    // Under 1 GB -> MB
-                    sizeStr = (sizeInBytes / (1024 * 1024)).toFixed(2).replace('.', ',') + " MB";
-                } else {
-                    // Over 1 GB -> GB
-                    sizeStr = (sizeInBytes / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',') + " GB";
-                }
-                
-                if (file.type.startsWith('image/')) {
-                    content = `![image:${file.name}|${sizeStr}](${base64Data})`;
-                } else if (file.type.startsWith('video/')) {
-                    content = `![video:${file.name}|${sizeStr}](${base64Data})`;
-                } else {
-                    content = `![file:${file.name}|${sizeStr}](${base64Data})`;
-                }
-
-                try {
-                    const res = await fetch(`${API_BASE_URL}/webhook`, {
+                    // Send chunk
+                    await fetch(`${API_BASE_URL}/webhook`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-Channel-Id': currentChannel
+                            'X-Channel-Id': 'file_storage'
                         },
                         body: JSON.stringify({
-                            username: 'FileBot',
-                            content: content
+                            username: 'System',
+                            content: base64Chunk,
+                            metadata: {
+                                fileId: fileId,
+                                index: i,
+                                total: totalChunks,
+                                filename: file.name,
+                                type: file.type
+                            }
                         })
                     });
-
-                    if (!res.ok && res.status !== 204) {
-                        throw new Error("Upload failed");
-                    }
-                    
-                    refreshChat();
-                } catch (err) {
-                    alert("Fehler beim Upload: " + err.message);
                 }
-            };
-            
-            reader.readAsDataURL(file);
-            input.value = ''; // Reset
+                
+                // 2. Send Notification Message to Chat
+                let sizeStr = "";
+                const sizeInBytes = file.size;
+                if (sizeInBytes < 1024 * 1024) sizeStr = (sizeInBytes / 1024).toFixed(2).replace('.', ',') + " KB";
+                else if (sizeInBytes < 1024 * 1024 * 1024) sizeStr = (sizeInBytes / (1024 * 1024)).toFixed(2).replace('.', ',') + " MB";
+                else sizeStr = (sizeInBytes / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',') + " GB";
+
+                let chatContent = "";
+                if (file.type.startsWith('image/')) chatContent = `![image:${file.name}|${sizeStr}](file://${fileId})`;
+                else if (file.type.startsWith('video/')) chatContent = `![video:${file.name}|${sizeStr}](file://${fileId})`;
+                else chatContent = `![file:${file.name}|${sizeStr}](file://${fileId})`;
+
+                await fetch(`${API_BASE_URL}/webhook`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Channel-Id': currentChannel },
+                    body: JSON.stringify({
+                        username: 'FileBot',
+                        content: chatContent
+                    })
+                });
+
+                btn.innerHTML = originalIcon;
+                refreshChat();
+
+            } catch (err) {
+                alert("Upload Fehler: " + err.message);
+                input.value = '';
+                btn.innerHTML = originalIcon;
+                return;
+            }
         }
 
         async function deleteMessage(id) {

@@ -121,7 +121,23 @@ module.exports = async (req, res) => {
         // 3. LIST MESSAGES
         if (path.includes('/api/list')) {
             const channelId = url.searchParams.get('channelId') || 'general';
-            const data = await supabaseRequest('GET', `events?select=*&path=eq.${channelId}&order=timestamp.desc&limit=50`);
+            const limit = parseInt(url.searchParams.get('limit')) || 50; // Allow custom limit
+            
+            // If channel is 'file_storage', we might need specific filtering
+            const fileId = url.searchParams.get('fileId');
+            
+            let endpoint = `events?select=*&path=eq.${channelId}`;
+            
+            if (fileId) {
+                // If fetching chunks for a specific file
+                // We assume headers contains the fileId. Since headers is text, we use ilike
+                endpoint += `&headers=ilike.*${fileId}*&order=timestamp.asc&limit=1000`;
+            } else {
+                // Normal chat
+                endpoint += `&order=timestamp.desc&limit=${limit}`;
+            }
+
+            const data = await supabaseRequest('GET', endpoint);
             return sendRes(res, 200, data);
         }
 
@@ -148,7 +164,7 @@ module.exports = async (req, res) => {
             }
         }
 
-        // 4. CHANNELS (GET / POST / DELETE)
+        // 4. WEBHOOK
         if (path.includes('/api/webhook')) {
             if (req.method === 'GET') {
                 return sendRes(res, 200, { type: 1, id: "123", name: "Hook", token: "fake" });
@@ -158,7 +174,12 @@ module.exports = async (req, res) => {
                 const channelId = req.headers['x-channel-id'] || url.searchParams.get('channelId') || 'general';
                 
                 let content = body.content || '';
-                if (body.embeds && Array.isArray(body.embeds)) {
+                // Support rich metadata in 'headers' column if provided (for file chunks)
+                // If body.metadata exists, store it in headers column as JSON string
+                let headersVal = null;
+                if (body.metadata) {
+                    headersVal = JSON.stringify(body.metadata);
+                } else if (body.embeds && Array.isArray(body.embeds)) {
                     body.embeds.forEach(e => content += `\n${e.title || ''} ${e.description || ''}`);
                 }
 
@@ -166,7 +187,8 @@ module.exports = async (req, res) => {
                     type: 'message',
                     name: body.username || 'Webhook',
                     content: content,
-                    path: channelId
+                    path: channelId,
+                    headers: headersVal
                 });
                 
                 return sendRes(res, 204, '');
