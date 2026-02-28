@@ -95,16 +95,22 @@ module.exports = async (req, res) => {
                 }
             }
             if (req.method === 'POST') {
-                const { name } = req.body; // Vercel parses body automatically? No, need manual if stream. 
-                // BUT Vercel Serverless Functions (Node) usually parse JSON body if content-type is set.
-                // We will assume req.body is available or we need a helper.
-                // Let's rely on Vercel's default body parsing for now.
+                const { name } = req.body;
+                if (!name) return sendRes(res, 400, { error: "Name required" });
                 
-                if (!req.body || !req.body.name) return sendRes(res, 400, { error: "Name required" });
-                
-                const data = await supabaseRequest('POST', 'channels', { name: req.body.name });
+                const data = await supabaseRequest('POST', 'channels', { name });
                 return sendRes(res, 200, data[0]);
             }
+
+            if (req.method === 'PATCH') {
+                const id = path.split('/').pop();
+                const { name } = req.body;
+                if (!name) return sendRes(res, 400, { error: "Name required" });
+                
+                await supabaseRequest('PATCH', `channels?id=eq.${id}`, { name });
+                return sendRes(res, 200, { success: true });
+            }
+
             if (req.method === 'DELETE') {
                 const id = path.split('/').pop();
                 await supabaseRequest('DELETE', `channels?id=eq.${id}`);

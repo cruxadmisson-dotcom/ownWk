@@ -277,14 +277,26 @@
             container.innerHTML = '';
 
             channels.forEach(channel => {
-                const isActive = channel.name === currentChannel; // Use name as ID for simplicity in this version
+                const isActive = channel.name === currentChannel;
                 const div = document.createElement('div');
                 div.className = `channel-item ${isActive ? 'active' : ''}`;
                 div.onclick = () => switchChannel(channel.name);
+                
+                // Channel Actions (Edit & Delete)
+                let actionsHtml = '';
+                if (channel.name !== 'general') {
+                    actionsHtml = `
+                        <div class="channel-actions">
+                            <i class="fa-solid fa-pencil" onclick="editChannel('${channel.id}', '${channel.name}', event)" style="margin-right:6px;"></i>
+                            <i class="fa-solid fa-trash" onclick="deleteChannel('${channel.id}', event)"></i>
+                        </div>
+                    `;
+                }
+
                 div.innerHTML = `
                     <i class="fa-solid fa-hashtag"></i>
                     <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${channel.name}</span>
-                    ${channel.name !== 'general' ? `<div class="channel-actions" onclick="deleteChannel('${channel.id}', event)"><i class="fa-solid fa-trash"></i></div>` : ''}
+                    ${actionsHtml}
                 `;
                 container.appendChild(div);
             });
@@ -328,6 +340,29 @@
                 switchChannel(name);
             } catch (err) {
                 alert("Fehler beim Erstellen: " + err.message);
+            }
+        }
+
+        async function editChannel(id, oldName, event) {
+            event.stopPropagation();
+            const newName = prompt("Kanal umbenennen:", oldName);
+            if (!newName || newName === oldName) return;
+            
+            const cleanName = newName.trim().toLowerCase().replace(/\s+/g, '-');
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/channels/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: cleanName })
+                });
+                if (!res.ok) throw new Error("Update failed");
+                
+                if (currentChannel === oldName) currentChannel = cleanName;
+                await loadChannels();
+                switchChannel(currentChannel);
+            } catch (err) {
+                alert("Fehler: " + err.message);
             }
         }
 
@@ -446,14 +481,22 @@
             // Basic formatting for links, bold, etc.
             if (!text) return '';
             
+            // Handle Images (Markdown syntax: ![alt](url))
+            // This regex captures ![alt](url) and replaces it with <img src="url">
+            // We use a non-greedy match for the alt text and url
+            text = text.replace(/!\[(.*?)\]\((data:image\/.*?;base64,.*?)\)/g, '<br><img src="$2" style="max-width:100%; max-height:300px; border-radius:4px; margin-top:8px;">');
+            
             // Replace newlines with <br>
             let formatted = text.replace(/\n/g, '<br>');
             
             // Simple markdown bold **text**
             formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
             
-            // Links
-            formatted = formatted.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#00a8fc;">$1</a>');
+            // Links (http/https) - Avoid replacing data URIs inside src attributes
+            // We use a negative lookbehind to ensure we don't match links inside src="..."
+            // Simplified: match links that are NOT preceded by ( or " or '
+            // This is tricky with regex. Better to rely on the browser's renderer or a library, but for now:
+            formatted = formatted.replace(/(?<!src="|src='|href="|href='|\()((https?):\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#00a8fc;">$1</a>');
             
             return formatted;
         }
@@ -503,29 +546,55 @@
             if (!input.files[0]) return;
             const file = input.files[0];
             
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('username', 'Admin'); // Or 'FileBot'
-            // We can append content if we want a caption
-            
-            try {
-                const res = await fetch(`${API_BASE_URL}/webhook`, {
-                    method: 'POST',
-                    headers: {
-                        'X-Channel-Id': currentChannel
-                    },
-                    body: formData // Fetch sets Content-Type to multipart/form-data automatically
-                });
-
-                if (!res.ok && res.status !== 204) {
-                    throw new Error("Upload failed");
-                }
-                
-                refreshChat();
-            } catch (err) {
-                alert("Fehler beim Upload: " + err.message);
+            // Check size (max 4MB for Vercel/Supabase direct insert safety)
+            if (file.size > 4 * 1024 * 1024) {
+                alert("Datei zu groß (Max 4MB)");
+                input.value = '';
+                return;
             }
+
+            // Convert to Base64
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Data = e.target.result;
+                const isImage = file.type.startsWith('image/');
+                
+                // Construct Markdown content
+                // If image: ![](data:image/png;base64,...)
+                // If file: [Filename](data:...) (Note: Data URIs for files might not download well in all clients, but works for basic view)
+                
+                let content = `**Dateiupload:** ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+                if (isImage) {
+                    content += `\n![${file.name}](${base64Data})`;
+                } else {
+                    // For non-images, we just post a text notice because data-uri links are often blocked or limited
+                    content += `\n*(Dateivorschau nicht verfügbar)*`;
+                }
+
+                try {
+                    const res = await fetch(`${API_BASE_URL}/webhook`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Channel-Id': currentChannel
+                        },
+                        body: JSON.stringify({
+                            username: 'FileBot',
+                            content: content
+                        })
+                    });
+
+                    if (!res.ok && res.status !== 204) {
+                        throw new Error("Upload failed");
+                    }
+                    
+                    refreshChat();
+                } catch (err) {
+                    alert("Fehler beim Upload: " + err.message);
+                }
+            };
             
+            reader.readAsDataURL(file);
             input.value = ''; // Reset
         }
 
