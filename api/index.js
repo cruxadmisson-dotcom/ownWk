@@ -135,13 +135,20 @@ module.exports = async (req, res) => {
             }
 
             if (req.method === 'PATCH') {
-                const { content } = req.body;
-                await supabaseRequest('PATCH', `events?id=eq.${id}`, { content });
+                if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
+                const { content, reactions } = req.body;
+                
+                const updateData = {};
+                if (content !== undefined) updateData.content = content;
+                if (reactions !== undefined) updateData.headers = JSON.stringify(reactions); // Store reactions in 'headers' column for simplicity as JSON string
+                
+                const { error } = await supabase.from('events').update(updateData).eq('id', id);
+                if (error) throw error;
                 return sendRes(res, 200, { success: true });
             }
         }
 
-        // 4. WEBHOOK
+        // 4. CHANNELS (GET / POST / DELETE)
         if (path.includes('/api/webhook')) {
             if (req.method === 'GET') {
                 return sendRes(res, 200, { type: 1, id: "123", name: "Hook", token: "fake" });

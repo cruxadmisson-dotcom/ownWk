@@ -68,7 +68,7 @@
         .msg-actions {
             display: none;
             position: absolute;
-            top: -10px;
+            top: -16px;
             right: 16px;
             background-color: var(--discord-dark);
             border: 1px solid var(--discord-darker);
@@ -84,6 +84,35 @@
         }
         .msg-action-btn:hover { background-color: var(--discord-hover); color: var(--discord-text); }
         .msg-action-btn.danger:hover { color: #f23f43; }
+        
+        /* Reactions */
+        .reactions-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .reaction-item {
+            background-color: #2f3136;
+            border-radius: 8px;
+            padding: 2px 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid transparent;
+            font-size: 14px;
+            color: var(--discord-text);
+        }
+        .reaction-item:hover {
+            border-color: #4f545c;
+            background-color: #36393f;
+        }
+        .reaction-count {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--discord-muted);
+        }
 
         /* Media & File Styles */
         .media-wrapper { position: relative; display: inline-block; max-width: 100%; margin-top: 6px; }
@@ -533,8 +562,9 @@
 
                 const msgHtmlContent = `
                         <div class="msg-actions">
-                            <div class="msg-action-btn" onclick="editMessage('${item.id}', '${content.replace(/'/g, "\\'")}')"><i class="fa-solid fa-pencil"></i></div>
-                            <div class="msg-action-btn danger" onclick="deleteMessage('${item.id}')"><i class="fa-solid fa-trash"></i></div>
+                            <div class="msg-action-btn" onclick="addReaction('${item.id}')" title="Reaktion hinzufügen"><i class="fa-solid fa-face-smile"></i></div>
+                            <div class="msg-action-btn" onclick="editMessage('${item.id}', '${content.replace(/'/g, "\\'")}')" title="Bearbeiten"><i class="fa-solid fa-pencil"></i></div>
+                            <div class="msg-action-btn danger" onclick="deleteMessage('${item.id}')" title="Löschen"><i class="fa-solid fa-trash"></i></div>
                         </div>
                         <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
                         <div class="msg-content">
@@ -543,6 +573,9 @@
                                 <span class="msg-timestamp">${dateStr}</span>
                             </div>
                             <div class="msg-text">${formatContent(content)}</div>
+                            <div class="reactions-container" id="reactions-${item.id}">
+                                ${renderReactions(item.headers, item.id)}
+                            </div>
                         </div>
                 `;
 
@@ -578,6 +611,80 @@
                     if (el) el.remove();
                 }
             });
+        }
+
+        function renderReactions(headers, msgId) {
+            if (!headers) return '';
+            try {
+                // headers column is used to store reactions JSON: { "🔥": 2, "👍": 1 }
+                const reactions = JSON.parse(headers);
+                if (Object.keys(reactions).length === 0) return '';
+                
+                let html = '';
+                for (const [emoji, count] of Object.entries(reactions)) {
+                    html += `
+                        <div class="reaction-item" onclick="addReaction('${msgId}', '${emoji}')">
+                            <span>${emoji}</span>
+                            <span class="reaction-count">${count}</span>
+                        </div>
+                    `;
+                }
+                return html;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        async function addReaction(id, emoji = null) {
+            if (!emoji) {
+                emoji = prompt("Emoji eingeben (z.B. 👍):");
+            }
+            if (!emoji) return;
+
+            // Optimistic update (client-side first)
+            const reactionContainer = document.getElementById(`reactions-${id}`);
+            // Fetch current reactions from DOM or re-fetch? 
+            // Better to re-fetch or keep state. For simplicity, we fetch the message or just send update.
+            // Since we don't have atomic increment in this simple setup, we read-modify-write.
+            // Actually, let's just use the current state from the DOM or memory if possible.
+            // But we need the full map.
+            
+            // Re-fetching message list is heavy. Let's try to patch blindly? No, we need current count.
+            // Let's fetch the specific message first (not implemented efficiently).
+            // Workaround: We find the message in the `channels` array? No, `renderMessages` doesn't store state globally.
+            // Let's just re-fetch the list silently to get latest state, then update.
+            // Or easier: Just send the new map. But we need the old map.
+            
+            // Let's grab it from the DOM for now (hacky but works for simple app)
+            // Actually, the `headers` attribute is not in DOM.
+            // We will fetch the single message via list filter? No, list returns all.
+            
+            // Better approach: Server handles increment? Our server is dumb.
+            // Okay, let's just do a fetch of the list, find the msg, update, and patch.
+            try {
+                const resList = await fetch(`${API_BASE_URL}/list?channelId=${currentChannel}`);
+                const data = await resList.json();
+                const msg = data.find(m => m.id == id);
+                
+                if (!msg) return;
+                
+                let reactions = {};
+                try { reactions = JSON.parse(msg.headers || '{}'); } catch(e) {}
+                
+                reactions[emoji] = (reactions[emoji] || 0) + 1;
+                
+                const resPatch = await fetch(`${API_BASE_URL}/messages/${id}`, { 
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reactions })
+                });
+                
+                if (!resPatch.ok) throw new Error("Reaction failed");
+                refreshChat();
+                
+            } catch(e) {
+                console.error(e);
+            }
         }
 
         function formatContent(text) {
@@ -704,6 +811,7 @@
                 let sizeStr = "";
                 const sizeInBytes = file.size;
                 
+                // Force MB for anything above 1MB, KB only for very small files
                 if (sizeInBytes < 1024 * 1024) {
                     // Under 1 MB -> KB
                     sizeStr = (sizeInBytes / 1024).toFixed(2).replace('.', ',') + " KB";
