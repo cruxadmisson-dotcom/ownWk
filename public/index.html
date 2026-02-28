@@ -26,6 +26,39 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
         body { background-color: var(--discord-darkest); color: var(--discord-text); display: flex; height: 100vh; overflow: hidden; }
 
+        /* Login Overlay */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--discord-darkest);
+            z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column;
+        }
+        .login-box {
+            background-color: var(--discord-dark);
+            padding: 32px;
+            border-radius: 5px;
+            width: 400px;
+            box-shadow: 0 2px 10px 0 rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .login-title { font-size: 24px; color: white; font-weight: bold; margin-bottom: 8px; }
+        .login-subtitle { color: var(--discord-muted); margin-bottom: 20px; }
+        .login-input {
+            width: 100%; padding: 10px; background-color: var(--discord-input);
+            border: 1px solid rgba(0,0,0,0.1); border-radius: 3px;
+            color: white; margin-bottom: 20px; outline: none;
+            font-size: 16px;
+        }
+        .login-btn {
+            width: 100%; padding: 10px; background-color: var(--discord-blue);
+            color: white; border: none; border-radius: 3px;
+            font-size: 16px; font-weight: 500; cursor: pointer;
+            transition: 0.2s;
+        }
+        .login-btn:hover { background-color: #4752c4; }
+        .error-msg { color: #f23f43; margin-top: 10px; font-size: 14px; display: none; }
+
         /* Guilds Sidebar (Leftmost) */
         .guilds-sidebar { width: 72px; background-color: var(--discord-darkest); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; flex-shrink: 0; }
         .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--discord-text); position: relative; }
@@ -268,6 +301,17 @@
     </style>
 </head>
 <body>
+    <!-- Login Overlay -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <div class="login-title">Willkommen zurück!</div>
+            <div class="login-subtitle">Wir freuen uns, dich wiederzusehen!</div>
+            <input type="password" id="login-password" class="login-input" placeholder="Passwort" onkeypress="handleLoginKey(event)">
+            <button class="login-btn" onclick="login()">Anmelden</button>
+            <div id="login-error" class="error-msg">Falsches Passwort!</div>
+        </div>
+    </div>
+
     <!-- Modal for Creating Channel -->
     <div class="modal-overlay" id="create-channel-modal">
         <div class="modal">
@@ -357,6 +401,33 @@
 
         // Initialize
         window.onload = async () => {
+            // Check auth
+            if (localStorage.getItem('discord_auth') === 'crux1500300636!') {
+                initApp();
+            } else {
+                // Show login
+                document.getElementById('login-overlay').style.display = 'flex';
+            }
+        };
+
+        function handleLoginKey(e) {
+            if (e.key === 'Enter') login();
+        }
+
+        function login() {
+            const pass = document.getElementById('login-password').value;
+            if (pass === 'crux1500300636!') {
+                localStorage.setItem('discord_auth', pass);
+                document.getElementById('login-overlay').style.display = 'none';
+                initApp();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        async function initApp() {
+            document.getElementById('login-overlay').style.display = 'none'; // Ensure hidden
+            
             await loadChannels();
             refreshChat();
             
@@ -364,16 +435,19 @@
             setInterval(refreshChat, 3000);
 
             // Enter key to send
-            document.getElementById('chat-input').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendChatMessage();
-                }
-            });
+            const input = document.getElementById('chat-input');
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatMessage();
+                    }
+                });
+            }
 
             // Emoji Picker Setup
             setupEmojiPicker();
-        };
+        }
 
         // --- Channel Management ---
 
