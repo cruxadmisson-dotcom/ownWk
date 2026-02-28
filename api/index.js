@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const multer = require('multer');
+// const multer = require('multer'); // Temporarily disabled
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+// require('dotenv').config(); // Temporarily disabled
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+// const upload = multer({ storage: multer.memoryStorage() });
 
 // Middleware
 app.use(cors());
@@ -38,6 +38,11 @@ const checkDb = (res) => {
 
 // --- ROUTES ---
 
+// 0. Root Handler
+app.get('/api/', (req, res) => {
+    res.json({ status: "online", engine: "express" });
+});
+
 // 1. GET /api/webhook - Mimic Discord Webhook Info
 app.get('/api/webhook', (req, res) => {
     res.json({
@@ -53,12 +58,14 @@ app.get('/api/webhook', (req, res) => {
 });
 
 // 2. POST /api/webhook - Receive Data (Mimic Discord)
-app.post('/api/webhook', upload.any(), async (req, res) => {
+// Temporarily removed upload middleware
+app.post('/api/webhook', async (req, res) => {
     if (!checkDb(res)) return;
 
     try {
         const { content, embeds, username, avatar_url } = req.body;
-        const files = req.files || [];
+        // const files = req.files || [];
+        const files = [];
         // Handle both X-Channel-Id header and query param (some tools use one or other)
         const channelId = req.headers['x-channel-id'] || req.query.channelId || 'general'; 
 
@@ -80,7 +87,6 @@ app.post('/api/webhook', upload.any(), async (req, res) => {
         // Process Files
         if (files.length > 0) {
             finalContent += `\n\n*[Attached ${files.length} file(s) - Storage not configured yet]*`;
-            // TODO: Implement actual file upload to Supabase Storage
         }
 
         // Insert into Supabase
