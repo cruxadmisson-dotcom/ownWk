@@ -99,20 +99,49 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             border: 1px solid transparent;
             font-size: 14px;
             color: var(--discord-text);
+            min-width: 32px;
+            height: 24px;
+            justify-content: center;
         }
         .reaction-item:hover {
             border-color: #4f545c;
             background-color: #36393f;
+        }
+        .reaction-item.active {
+            background-color: rgba(88, 101, 242, 0.15);
+            border-color: #5865f2;
         }
         .reaction-count {
             font-size: 12px;
             font-weight: bold;
             color: var(--discord-muted);
         }
+        .reaction-item.active .reaction-count {
+            color: #dee0fc;
+        }
+        .add-reaction-btn {
+            background-color: transparent !important;
+            color: #b9bbbe !important;
+            padding: 2px 4px !important;
+            gap: 2px !important;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+        .add-reaction-btn:hover {
+            background-color: #36393f !important;
+            color: #dcddde !important;
+        }
+        .message:hover .add-reaction-btn {
+            opacity: 1;
+        }
+        /* Always show if there are existing reactions, otherwise only on hover (handled by parent .reactions-container check in JS or just always render empty container?) 
+           Actually, the screenshot shows the add button next to reactions.
+           If no reactions, it's usually hidden until hover.
+        */
 
         /* Media & File Styles */
         .media-wrapper { position: relative; display: inline-block; max-width: 100%; margin-top: 6px; }
@@ -575,6 +604,10 @@
                             <div class="msg-text">${formatContent(content)}</div>
                             <div class="reactions-container" id="reactions-${item.id}">
                                 ${renderReactions(item.headers, item.id)}
+                                <div class="reaction-item add-reaction-btn" onclick="addReaction('${item.id}')" title="Reagieren">
+                                    <i class="fa-solid fa-plus" style="font-size: 10px;"></i>
+                                    <i class="fa-solid fa-face-smile" style="font-size: 12px;"></i>
+                                </div>
                             </div>
                         </div>
                 `;
@@ -622,9 +655,14 @@
                 
                 let html = '';
                 for (const [emoji, count] of Object.entries(reactions)) {
+                    // Check if active (we don't track user per reaction yet, so we assume if count > 0 it's visible)
+                    // In a real app we would check if *current user* reacted.
+                    // For style demo, we can just style it normally.
+                    const isActive = false; // Toggle this if we had user tracking
+                    
                     html += `
-                        <div class="reaction-item" onclick="addReaction('${msgId}', '${emoji}')">
-                            <span>${emoji}</span>
+                        <div class="reaction-item ${isActive ? 'active' : ''}" onclick="addReaction('${msgId}', '${emoji}')">
+                            <span style="line-height: 1;">${emoji}</span>
                             <span class="reaction-count">${count}</span>
                         </div>
                     `;
