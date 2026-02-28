@@ -1,236 +1,120 @@
-const express = require('express');
-const cors = require('cors');
-// const multer = require('multer'); // Temporarily disabled
+// Minimal API for Vercel
 const { createClient } = require('@supabase/supabase-js');
-// require('dotenv').config(); // Temporarily disabled
 
-const app = express();
-// const upload = multer({ storage: multer.memoryStorage() });
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Supabase Client Initialization
+// Init Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
-let supabase;
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-try {
-    if (!supabaseUrl || !supabaseKey) {
-        console.warn("⚠️ SUPABASE_URL or SUPABASE_KEY (or SUPABASE_ANON_KEY) is missing. Database features will fail.");
-    } else {
-        supabase = createClient(supabaseUrl, supabaseKey);
+module.exports = async (req, res) => {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Channel-Id'
+    );
+
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
     }
-} catch (err) {
-    console.error("Supabase Init Error:", err.message);
-}
-
-// Helper to check DB connection
-const checkDb = (res) => {
-    if (!supabase) {
-        res.status(500).json({ error: "Server Configuration Error: Missing Supabase Env Vars" });
-        return false;
-    }
-    return true;
-};
-
-// --- ROUTES ---
-
-// 0. Root Handler
-app.get('/api/', (req, res) => {
-    res.json({ status: "online", engine: "express" });
-});
-
-// 1. GET /api/webhook - Mimic Discord Webhook Info
-app.get('/api/webhook', (req, res) => {
-    res.json({
-        type: 1,
-        id: "123456789012345678",
-        name: "Captain Hook",
-        avatar: null,
-        channel_id: "123456789012345678",
-        guild_id: "123456789012345678",
-        application_id: null,
-        token: "super-secret-token"
-    });
-});
-
-// 2. POST /api/webhook - Receive Data (Mimic Discord)
-// Temporarily removed upload middleware
-app.post('/api/webhook', async (req, res) => {
-    if (!checkDb(res)) return;
 
     try {
-        const { content, embeds, username, avatar_url } = req.body;
-        // const files = req.files || [];
-        const files = [];
-        // Handle both X-Channel-Id header and query param (some tools use one or other)
-        const channelId = req.headers['x-channel-id'] || req.query.channelId || 'general'; 
+        const path = req.url.split('?')[0];
+        
+        // 1. HEALTH CHECK
+        if (path === '/api/health') {
+            if (!supabase) return res.status(500).json({ status: "error", error: "Missing Supabase Config" });
+            const { error } = await supabase.from('channels').select('count', { count: 'exact', head: true });
+            if (error) return res.status(500).json({ status: "db_error", details: error });
+            return res.json({ status: "ok", db: "connected" });
+        }
 
-        // Process Embeds
-        let finalContent = content || '';
-        if (embeds) {
-            const embedList = typeof embeds === 'string' ? JSON.parse(embeds) : embeds;
-            embedList.forEach(embed => {
-                if (embed.title) finalContent += `\n**${embed.title}**`;
-                if (embed.description) finalContent += `\n${embed.description}`;
-                if (embed.fields) {
-                    embed.fields.forEach(f => {
-                        finalContent += `\n*${f.name}:* ${f.value}`;
+        // 2. LIST MESSAGES
+        if (path === '/api/list') {
+            if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
+            const channelId = req.query.channelId || 'general';
+            const { data, error } = await supabase
+                .from('events')
+                .select('*')
+                .eq('path', channelId)
+                .order('timestamp', { ascending: false })
+                .limit(50);
+            
+            if (error) throw error;
+            return res.json(data || []);
+        }
+
+        // 3. CHANNELS (GET / POST / DELETE)
+        if (path.startsWith('/api/channels')) {
+            if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
+            
+            if (req.method === 'GET') {
+                const { data, error } = await supabase.from('channels').select('*').order('created_at', { ascending: true });
+                if (error) {
+                    if (error.code === '42P01') return res.json([]); // Table missing -> empty list
+                    throw error;
+                }
+                return res.json(data);
+            }
+
+            if (req.method === 'POST') {
+                const { name } = req.body;
+                if (!name) return res.status(400).json({ error: "Name required" });
+                const { data, error } = await supabase.from('channels').insert([{ name }]).select();
+                if (error) throw error;
+                return res.json(data[0]);
+            }
+
+            if (req.method === 'DELETE') {
+                const id = path.split('/').pop();
+                const { error } = await supabase.from('channels').delete().eq('id', id);
+                if (error) throw error;
+                return res.json({ success: true });
+            }
+        }
+
+        // 4. WEBHOOK (POST / GET)
+        if (path === '/api/webhook') {
+            if (req.method === 'GET') {
+                return res.json({
+                    type: 1, id: "1234567890", name: "Captain Hook", channel_id: "123", guild_id: "123", token: "fake"
+                });
+            }
+
+            if (req.method === 'POST') {
+                if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
+                
+                const { content, embeds, username } = req.body;
+                const channelId = req.headers['x-channel-id'] || req.query.channelId || 'general';
+                
+                let finalContent = content || '';
+                if (embeds && Array.isArray(embeds)) {
+                    embeds.forEach(e => {
+                        if (e.title) finalContent += `\n**${e.title}**`;
+                        if (e.description) finalContent += `\n${e.description}`;
                     });
                 }
-            });
-        }
 
-        // Process Files
-        if (files.length > 0) {
-            finalContent += `\n\n*[Attached ${files.length} file(s) - Storage not configured yet]*`;
-        }
-
-        // Insert into Supabase
-        const { error } = await supabase
-            .from('events')
-            .insert([
-                {
+                const { error } = await supabase.from('events').insert([{
                     type: 'message',
                     name: username || 'Webhook',
                     content: finalContent,
-                    path: channelId // Using 'path' column to store channel_id/name
-                }
-            ]);
+                    path: channelId
+                }]);
 
-        if (error) throw error;
-
-        // Return 204 No Content (Discord Standard)
-        res.status(204).send();
-
-    } catch (error) {
-        console.error('Webhook Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 3. GET /api/list - List Messages
-app.get('/api/list', async (req, res) => {
-    if (!checkDb(res)) return;
-
-    try {
-        const channelId = req.query.channelId || 'general';
-        
-        // Fetch messages for the specific channel
-        const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .eq('path', channelId) // Filtering by 'path' which stores channel_id
-            .order('timestamp', { ascending: false })
-            .limit(50);
-
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        console.error('List Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 4. GET /api/channels - List Channels
-app.get('/api/channels', async (req, res) => {
-    if (!checkDb(res)) return;
-
-    try {
-        const { data, error } = await supabase
-            .from('channels')
-            .select('*')
-            .order('created_at', { ascending: true });
-
-        if (error) {
-            // If table doesn't exist, return empty list gracefully (or default)
-            if (error.code === '42P01') { // undefined_table
-                 console.warn("Channels table missing, returning empty");
-                 return res.json([]);
+                if (error) throw error;
+                return res.status(204).end();
             }
-            throw error;
         }
-        res.json(data);
-    } catch (error) {
-        console.error('Channels Error:', error);
-        res.status(500).json({ error: error.message, code: error.code, details: error.details, hint: error.hint });
+
+        // 404
+        res.status(404).json({ error: "Not Found", path });
+
+    } catch (err) {
+        console.error("API Error:", err);
+        res.status(500).json({ error: err.message });
     }
-});
-
-// 5. POST /api/channels - Create Channel
-app.post('/api/channels', async (req, res) => {
-    if (!checkDb(res)) return;
-
-    try {
-        const { name } = req.body;
-        if (!name) return res.status(400).json({ error: 'Name is required' });
-
-        const { data, error } = await supabase
-            .from('channels')
-            .insert([{ name }])
-            .select();
-
-        if (error) throw error;
-        res.json(data[0]);
-    } catch (error) {
-        console.error('Create Channel Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 6. DELETE /api/channels/:id - Delete Channel
-app.delete('/api/channels/:id', async (req, res) => {
-    if (!checkDb(res)) return;
-
-    try {
-        const { id } = req.params;
-        
-        // Also delete messages? Optional. For now just delete channel.
-        const { error } = await supabase
-            .from('channels')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Delete Channel Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 7. GET /api/health - Diagnostic
-app.get('/api/health', async (req, res) => {
-    const status = {
-        env: {
-            SUPABASE_URL: !!supabaseUrl,
-            SUPABASE_KEY: !!supabaseKey
-        },
-        db: 'unknown'
-    };
-    
-    if (supabase) {
-        try {
-            const { data, error } = await supabase.from('channels').select('count', { count: 'exact', head: true });
-            if (error) {
-                status.db = 'error';
-                status.details = error;
-            } else {
-                status.db = 'connected';
-            }
-        } catch (e) {
-            status.db = 'exception';
-            status.details = e.message;
-        }
-    } else {
-        status.db = 'not_initialized';
-    }
-    
-    res.json(status);
-});
-
-// Export the app for Vercel
-module.exports = app;
+};
