@@ -176,6 +176,32 @@
            If no reactions, it's usually hidden until hover.
         */
 
+        .embed-wrapper {
+            background-color: #2b2d31;
+            border-left: 4px solid #ffffff; /* Default white border, can be customized */
+            border-radius: 4px;
+            padding: 8px 16px 16px 12px;
+            margin-top: 8px;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .embed-provider { font-size: 12px; color: var(--discord-text); }
+        .embed-title { font-size: 16px; font-weight: 600; color: #00a8fc; text-decoration: none; display: block; }
+        .embed-title:hover { text-decoration: underline; }
+        .embed-description { font-size: 14px; color: var(--discord-text); margin-top: 4px; }
+        .embed-image { max-width: 100%; border-radius: 4px; margin-top: 8px; display: block; position: relative; }
+        .embed-video-container { position: relative; margin-top: 8px; background: black; border-radius: 4px; overflow: hidden; }
+        .embed-video-container video { width: 100%; display: block; }
+        .play-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.3); cursor: pointer;
+        }
+        .play-overlay i { font-size: 48px; color: rgba(255,255,255,0.8); }
+        .play-overlay:hover i { color: white; transform: scale(1.1); transition: 0.2s; }
+
         /* Media & File Styles */
         .media-wrapper { position: relative; display: inline-block; max-width: 100%; margin-top: 6px; }
         .media-wrapper img, .media-wrapper video { max-width: 100%; max-height: 350px; border-radius: 6px; display: block; }
@@ -909,6 +935,69 @@
             formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
             formatted = formatted.replace(/(?<!src="|src='|href="|href='|\()((https?):\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#00a8fc;">$1</a>');
             
+            // Check for Embeds (xHamster, YouTube, etc.)
+            // Simple heuristic: if the message contains a link, try to embed it.
+            // For now, let's target specific domains requested (xHamster) and generic OpenGraph-like style.
+            
+            // Regex to find links again (raw) to process embeds
+            const linkRegex = /((https?):\/\/[^\s<]+)/g;
+            let match;
+            while ((match = linkRegex.exec(text)) !== null) {
+                const url = match[0];
+                
+                // xHamster Embed
+                if (url.includes('xhamster')) {
+                    // We can't fetch metadata client-side due to CORS usually.
+                    // But we can fake the style based on the URL or just render a generic card.
+                    // Or if the user wants a specific "fake" embed for testing.
+                    
+                    // Extract title from URL if possible (slug)
+                    let title = "xHamster Video";
+                    try {
+                        const parts = url.split('/');
+                        const slug = parts[parts.length - 1] || parts[parts.length - 2];
+                        title = slug.replace(/-/g, ' ').replace(/xh[a-z0-9]+$/i, '').trim();
+                        // Capitalize first letter
+                        title = title.charAt(0).toUpperCase() + title.slice(1);
+                    } catch(e) {}
+
+                    const embedHtml = `
+                        <div class="embed-wrapper" style="border-left-color: #ffffff;">
+                            <div class="embed-provider">xHamster</div>
+                            <a href="${url}" target="_blank" class="embed-title">${title || 'Video'}</a>
+                            <!-- Fake video player look -->
+                            <div class="embed-video-container" onclick="window.open('${url}', '_blank')">
+                                <div style="width:100%; height:250px; background:#000; display:flex; align-items:center; justify-content:center;">
+                                    <!-- Placeholder thumbnail if we can't get real one easily without backend proxy -->
+                                    <i class="fa-solid fa-play" style="font-size: 48px; color: rgba(255,255,255,0.8);"></i>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    formatted += embedHtml;
+                }
+                // YouTube Embed (Bonus)
+                else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                     // Extract ID
+                     let videoId = '';
+                     if(url.includes('youtu.be')) videoId = url.split('/').pop();
+                     else videoId = url.split('v=')[1]?.split('&')[0];
+
+                     if (videoId) {
+                         const embedHtml = `
+                            <div class="embed-wrapper" style="border-left-color: #ff0000; max-width: 560px;">
+                                <div class="embed-provider">YouTube</div>
+                                <a href="${url}" target="_blank" class="embed-title">YouTube Video</a>
+                                <div class="embed-video-container">
+                                    <iframe width="100%" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                </div>
+                            </div>
+                         `;
+                         formatted += embedHtml;
+                     }
+                }
+            }
+
             return formatted;
         }
 
