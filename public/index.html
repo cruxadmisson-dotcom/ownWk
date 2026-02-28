@@ -19,26 +19,48 @@
             --discord-green: #23a559;
             --discord-header: #ffffff;
             --discord-input: #383a40;
+            --discord-hover: rgba(79, 84, 92, 0.32);
+            --discord-selected: rgba(79, 84, 92, 0.6);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
         body { background-color: var(--discord-darkest); color: var(--discord-text); display: flex; height: 100vh; overflow: hidden; }
 
+        /* Guilds Sidebar (Leftmost) */
         .guilds-sidebar { width: 72px; background-color: var(--discord-darkest); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 8px; flex-shrink: 0; }
-        .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--discord-text); }
+        .guild-icon { width: 48px; height: 48px; border-radius: 50%; background-color: var(--discord-dark); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--discord-text); position: relative; }
         .guild-icon:hover { border-radius: 30%; background-color: var(--discord-blue); color: white; }
         .guild-icon.active { border-radius: 30%; background-color: var(--discord-blue); color: white; }
         .guild-separator { width: 32px; height: 2px; background-color: var(--discord-dark); border-radius: 1px; margin: 4px 0; }
 
+        /* Channels Sidebar */
         .channels-sidebar { width: 240px; background-color: var(--discord-sidebar); display: flex; flex-direction: column; flex-shrink: 0; }
-        .server-header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; color: white; box-shadow: 0 1px 0 rgba(0,0,0,0.2); cursor: pointer; }
+        .server-header { height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; color: white; box-shadow: 0 1px 0 rgba(0,0,0,0.2); cursor: pointer; transition: background 0.2s; }
+        .server-header:hover { background-color: rgba(255,255,255,0.05); }
         .channel-list { padding: 8px; flex: 1; overflow-y: auto; }
-        .channel-category { padding: 18px 8px 4px 8px; font-size: 12px; font-weight: bold; color: var(--discord-muted); text-transform: uppercase; }
-        .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; }
-        .channel-item:hover { background-color: rgba(255,255,255,0.05); color: var(--discord-text); }
-        .channel-item.active { background-color: rgba(255,255,255,0.1); color: white; }
-        .channel-item i { font-size: 18px; opacity: 0.6; }
+        
+        .channel-category { 
+            padding: 18px 8px 4px 8px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            color: var(--discord-muted); 
+            text-transform: uppercase; 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+        }
+        .channel-category:hover .add-channel-btn { display: block; }
+        .add-channel-btn { display: none; cursor: pointer; color: var(--discord-text); }
 
+        .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; position: relative; }
+        .channel-item:hover { background-color: var(--discord-hover); color: var(--discord-text); }
+        .channel-item.active { background-color: var(--discord-selected); color: white; }
+        .channel-item i { font-size: 18px; opacity: 0.6; }
+        .channel-actions { display: none; margin-left: auto; color: var(--discord-muted); }
+        .channel-item:hover .channel-actions { display: block; }
+        .channel-actions i:hover { color: #f23f43; }
+
+        /* User Panel (Bottom Left) */
         .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
         .user-avatar { width: 32px; height: 32px; border-radius: 50%; background-color: #5865f2; position: relative; }
         .user-avatar::after { content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background-color: var(--discord-green); border: 2px solid #232428; }
@@ -46,57 +68,88 @@
         .username { font-size: 14px; font-weight: bold; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .user-status { font-size: 12px; color: var(--discord-muted); }
 
+        /* Chat Area */
         .chat-container { flex: 1; display: flex; flex-direction: column; background-color: var(--discord-dark); min-width: 0; }
         .chat-header { height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 0 rgba(0,0,0,0.2); flex-shrink: 0; }
         .chat-header i { color: var(--discord-muted); font-size: 20px; }
         .chat-header h2 { font-size: 16px; color: white; }
 
         .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; }
-
-        .welcome-section { margin-bottom: 24px; padding-bottom: 16px; }
+        
+        .welcome-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .welcome-hash { width: 68px; height: 68px; background-color: #41434a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 42px; color: white; margin-bottom: 16px; }
         .welcome-title { font-size: 32px; font-weight: 800; color: white; margin-bottom: 8px; }
         .welcome-subtitle { color: var(--discord-muted); font-size: 16px; }
 
         .message { display: flex; gap: 16px; padding: 2px 16px; margin-top: 1.0625rem; }
-        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; }
+        .message:hover { background-color: rgba(0,0,0,0.04); }
+        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; overflow: hidden; }
+        .msg-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .msg-content { flex: 1; min-width: 0; }
         .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
         .msg-author { font-weight: 500; color: white; }
         .msg-timestamp { font-size: 12px; color: var(--discord-muted); }
         .msg-text { color: var(--discord-text); line-height: 1.375rem; white-space: pre-wrap; word-wrap: break-word; }
 
-        .attachment-box { margin-top: 8px; background-color: var(--discord-darker); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 12px; display: flex; align-items: center; gap: 12px; max-width: 400px; }
-        .media-preview { margin-top: 8px; border-radius: 8px; overflow: hidden; max-width: 550px; border: 1px solid rgba(255,255,255,0.05); }
-        .media-preview img, .media-preview video { max-width: 100%; display: block; max-height: 400px; }
-
         .chat-input-area { padding: 0 16px 24px 16px; flex-shrink: 0; }
         .input-wrapper { background-color: var(--discord-input); border-radius: 8px; display: flex; align-items: center; padding: 0 16px; min-height: 44px; position: relative; }
         .plus-btn { font-size: 20px; color: var(--discord-muted); cursor: pointer; margin-right: 16px; }
         .main-input { flex: 1; background: transparent; border: none; color: var(--discord-text); font-size: 16px; outline: none; padding: 11px 0; }
         .input-icons { display: flex; gap: 16px; color: var(--discord-muted); font-size: 20px; }
-        .input-icons i { cursor: pointer; }
+        .input-icons i { cursor: pointer; transition: 0.2s; }
+        .input-icons i:hover { color: var(--discord-text); }
         .emoji-picker-pop { position: absolute; bottom: 60px; right: 0; z-index: 100; display: none; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal { background: #313338; width: 440px; border-radius: 5px; padding: 24px; box-shadow: 0 2px 10px 0 rgba(0,0,0,0.2); }
+        .modal h3 { color: white; margin-bottom: 16px; font-size: 20px; text-align: center; }
+        .modal input { width: 100%; background: #1e1f22; border: none; padding: 10px; color: white; border-radius: 3px; margin-bottom: 20px; outline: none; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+        .btn { padding: 10px 24px; border-radius: 3px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }
+        .btn-cancel { background: transparent; color: white; }
+        .btn-cancel:hover { text-decoration: underline; }
+        .btn-create { background: #5865f2; color: white; }
+        .btn-create:hover { background: #4752c4; }
+
     </style>
 </head>
 <body>
+    <!-- Modal for Creating Channel -->
+    <div class="modal-overlay" id="create-channel-modal">
+        <div class="modal">
+            <h3>Kanal erstellen</h3>
+            <div style="color: #b5bac1; font-size: 12px; font-weight: 700; margin-bottom: 8px; text-transform: uppercase;">Kanalname</div>
+            <div style="background: #1e1f22; display: flex; align-items: center; border-radius: 3px; padding-left: 10px;">
+                <i class="fa-solid fa-hashtag" style="color: #949ba4;"></i>
+                <input type="text" id="new-channel-name" placeholder="new-channel" style="margin-bottom: 0;">
+            </div>
+            <div class="modal-actions" style="margin-top: 24px;">
+                <button class="btn btn-cancel" onclick="closeModal()">Abbrechen</button>
+                <button class="btn btn-create" onclick="createChannel()">Erstellen</button>
+            </div>
+        </div>
+    </div>
+
     <div class="guilds-sidebar">
         <div class="guild-icon active"><i class="fa-brands fa-discord" style="font-size: 28px;"></i></div>
         <div class="guild-separator"></div>
-        <div class="guild-icon">PS</div>
-        <div class="guild-icon"><i class="fa-solid fa-plus"></i></div>
+        <div class="guild-icon" title="Add Server"><i class="fa-solid fa-plus"></i></div>
     </div>
 
     <div class="channels-sidebar">
         <div class="server-header">
-            <span>Privat Server</span>
+            <span>Mein Server</span>
             <i class="fa-solid fa-chevron-down" style="font-size: 14px;"></i>
         </div>
         <div class="channel-list" id="channel-list">
-            <div class="channel-category">Textkanäle</div>
-            <div class="channel-item active" onclick="switchChannel('andere')"><i class="fa-solid fa-hashtag"></i> andere</div>
-            <div class="channel-item" onclick="switchChannel('websiten')"><i class="fa-solid fa-hashtag"></i> websiten</div>
-            <div class="channel-item" onclick="switchChannel('logos')"><i class="fa-solid fa-hashtag"></i> logos</div>
+            <div class="channel-category">
+                Textkanäle
+                <i class="fa-solid fa-plus add-channel-btn" onclick="openModal()" title="Kanal erstellen"></i>
+            </div>
+            <div id="channels-container">
+                <!-- Channels will be loaded here -->
+            </div>
         </div>
         <div class="user-panel">
             <div class="user-avatar"></div>
@@ -113,15 +166,15 @@
     </div>
 
     <div class="chat-container">
-        <!-- Error Banner (Hidden by default) -->
-        <div id="error-banner" style="background-color: #f23f43; color: white; padding: 16px; text-align: center; display: none; font-weight: bold;">
+        <!-- Error Banner -->
+        <div id="error-banner" style="background-color: #f23f43; color: white; padding: 10px; text-align: center; display: none; font-weight: bold; font-size: 14px;">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span id="error-text">Verbindungsfehler</span>
         </div>
 
         <div class="chat-header">
             <i class="fa-solid fa-hashtag"></i>
-            <h2 id="current-channel-name">andere</h2>
+            <h2 id="current-channel-name">general</h2>
         </div>
         
         <div class="chat-messages" id="chat-feed">
@@ -131,10 +184,12 @@
         <div class="chat-input-area">
             <div class="input-wrapper">
                 <i class="fa-solid fa-circle-plus plus-btn" onclick="document.getElementById('file-input').click()"></i>
-                <input type="text" class="main-input" id="chat-input" placeholder="Nachricht an #andere">
+                <input type="text" class="main-input" id="chat-input" placeholder="Nachricht an #general">
                 <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(this)">
                 
                 <div class="input-icons">
+                    <i class="fa-solid fa-gift"></i>
+                    <i class="fa-solid fa-sticky-note"></i>
                     <i class="fa-solid fa-face-smile" id="emoji-btn"></i>
                 </div>
                 <div class="emoji-picker-pop" id="emoji-picker"></div>
@@ -144,86 +199,173 @@
 
     <script>
         const API_BASE_URL = window.location.origin + '/api';
-        const chatFeed = document.getElementById('chat-feed');
-        const chatInput = document.getElementById('chat-input');
-        
-        let currentChannel = 'andere';
+        let currentChannel = 'general'; // Default channel ID/name
+        let channels = [];
 
-        window.onload = () => {
+        // Initialize
+        window.onload = async () => {
+            await loadChannels();
             refreshChat();
+            
+            // Auto-refresh chat every 3 seconds
             setInterval(refreshChat, 3000);
 
-            chatInput.addEventListener('keydown', (e) => {
+            // Enter key to send
+            document.getElementById('chat-input').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     sendChatMessage();
                 }
             });
 
-            const emojiBtn = document.getElementById('emoji-btn');
-            const emojiPicker = document.getElementById('emoji-picker');
-            const picker = picmo.createPicker({ rootElement: emojiPicker });
-            
-            emojiBtn.onclick = (e) => {
-                e.stopPropagation();
-                emojiPicker.style.display = emojiPicker.style.display === 'block' ? 'none' : 'block';
-            };
-
-            picker.addEventListener('emoji:select', (selection) => {
-                chatInput.value += selection.emoji;
-                emojiPicker.style.display = 'none';
-                chatInput.focus();
-            });
-
-            document.onclick = () => {
-                emojiPicker.style.display = 'none';
-            };
+            // Emoji Picker Setup
+            setupEmojiPicker();
         };
+
+        // --- Channel Management ---
+
+        async function loadChannels() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/channels`);
+                if (!res.ok) throw new Error('Failed to load channels');
+                const data = await res.json();
+                
+                // Merge with default 'general' if empty or not present
+                if (data.length === 0) {
+                    // If no channels in DB, show at least 'general'
+                    channels = [{ id: 'general', name: 'general' }];
+                } else {
+                    channels = data;
+                }
+                
+                renderChannels();
+            } catch (err) {
+                console.error("Error loading channels:", err);
+                // Fallback
+                channels = [{ id: 'general', name: 'general' }];
+                renderChannels();
+            }
+        }
+
+        function renderChannels() {
+            const container = document.getElementById('channels-container');
+            container.innerHTML = '';
+
+            channels.forEach(channel => {
+                const isActive = channel.name === currentChannel; // Use name as ID for simplicity in this version
+                const div = document.createElement('div');
+                div.className = `channel-item ${isActive ? 'active' : ''}`;
+                div.onclick = () => switchChannel(channel.name);
+                div.innerHTML = `
+                    <i class="fa-solid fa-hashtag"></i>
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${channel.name}</span>
+                    ${channel.name !== 'general' ? `<div class="channel-actions" onclick="deleteChannel('${channel.id}', event)"><i class="fa-solid fa-trash"></i></div>` : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
 
         function switchChannel(name) {
             currentChannel = name;
             document.getElementById('current-channel-name').innerText = name;
             document.getElementById('chat-input').placeholder = `Nachricht an #${name}`;
-            
-            document.querySelectorAll('.channel-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.innerText.includes(name)) item.classList.add('active');
-            });
+            renderChannels(); // Re-render to update active state
             refreshChat();
         }
 
+        function openModal() {
+            document.getElementById('create-channel-modal').style.display = 'flex';
+            document.getElementById('new-channel-name').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('create-channel-modal').style.display = 'none';
+            document.getElementById('new-channel-name').value = '';
+        }
+
+        async function createChannel() {
+            const nameInput = document.getElementById('new-channel-name');
+            const name = nameInput.value.trim().toLowerCase().replace(/\s+/g, '-');
+            
+            if (!name) return;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/channels`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                if (!res.ok) throw new Error('Failed to create channel');
+                
+                await loadChannels();
+                closeModal();
+                switchChannel(name);
+            } catch (err) {
+                alert("Fehler beim Erstellen: " + err.message);
+            }
+        }
+
+        async function deleteChannel(id, event) {
+            event.stopPropagation(); // Prevent switching channel when clicking delete
+            if (!confirm('Kanal wirklich löschen?')) return;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/channels/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!res.ok) throw new Error('Failed to delete channel');
+                
+                await loadChannels();
+                if (channels.length > 0) switchChannel(channels[0].name);
+            } catch (err) {
+                alert("Fehler beim Löschen: " + err.message);
+            }
+        }
+
+        // --- Chat & Messages ---
+
         async function refreshChat() {
             try {
-                const res = await fetch(`${API_BASE_URL}/list`);
+                // Fetch all messages for current channel
+                // Note: The API should ideally filter by channel, currently fetching all and filtering client-side or server-side?
+                // Our new API supports ?channelId=...
+                const res = await fetch(`${API_BASE_URL}/list?channelId=${currentChannel}`);
+                
                 if (!res.ok) {
-                    const json = await res.json().catch(() => ({}));
-                    if (json.missing_vars) {
-                        document.getElementById('error-banner').style.display = 'block';
-                        document.getElementById('error-text').innerHTML = `SETUP ERFORDERLICH: <a href="https://vercel.com/docs/projects/environment-variables" target="_blank" style="color:white;text-decoration:underline;">Supabase Environment Variables</a> fehlen in Vercel.`;
-                        return;
-                    }
-                    console.error("List fetch error");
+                    // Handle Vercel errors or 500s
+                    document.getElementById('error-banner').style.display = 'block';
+                    document.getElementById('error-text').innerText = "Verbindung zum Server unterbrochen.";
                     return;
                 }
                 
-                // Hide banner if successful
                 document.getElementById('error-banner').style.display = 'none';
-                
                 const data = await res.json();
-                
-                // Filter messages for current channel
-                const filtered = data.filter(item => {
-                    if (item.type === 'upload') return item.content === currentChannel || (!item.content && currentChannel === 'andere');
-                    return item.name === currentChannel || (!item.name && currentChannel === 'andere');
-                });
-                
-                renderMessages(filtered);
+                renderMessages(data);
             } catch (err) {
-                console.error("Fetch error:", err);
+                console.error("Chat refresh error:", err);
             }
         }
 
         function renderMessages(data) {
+            const chatFeed = document.getElementById('chat-feed');
+            
+            if (data.length === 0) {
+                chatFeed.innerHTML = `
+                    <div class="welcome-section">
+                        <div class="welcome-hash">#</div>
+                        <h1 class="welcome-title">Willkommen bei #${currentChannel}!</h1>
+                        <p class="welcome-subtitle">Das ist der Beginn des Kanals #${currentChannel}.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by timestamp ascending (oldest first) for chat flow
+            // But API returns newest first (desc). So we reverse.
+            const sorted = [...data].reverse();
+
             let html = `
                 <div class="welcome-section">
                     <div class="welcome-hash">#</div>
@@ -232,131 +374,157 @@
                 </div>
             `;
 
-            data.forEach(item => {
+            sorted.forEach(item => {
                 const ts = new Date(item.timestamp);
-                const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const dateStr = ts.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' });
-                
-                const headers = typeof item.headers === 'string' ? JSON.parse(item.headers) : (item.headers || {});
-                const ip = headers.ip || '';
-                
-                let author = 'Webhook';
-                let content = item.content;
-                let avatarColor = '#23a559';
-                let avatarInitial = 'W';
+                // Formatting: "Today at 4:20 PM" style is complex, using simple locale for now
+                const dateStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-                if (item.type === 'upload') {
-                    author = 'File Bot';
-                    avatarColor = '#f57731';
-                    avatarInitial = 'F';
-                    const isImg = item.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                    const isVid = item.name.match(/\.(mp4|webm|mov)$/i);
-                    
-                    content = `
-                        <div class="attachment-box">
-                            <i class="fa-solid fa-file-zipper" style="font-size: 24px; color: var(--discord-muted);"></i>
-                            <div style="flex:1">
-                                <a href="${item.path}" target="_blank" style="color: #00a8fc; text-decoration: none; font-weight: 500;">${item.name}</a>
-                                <div style="font-size: 12px; color: var(--discord-muted);">${(item.size/1024).toFixed(1)} KB</div>
-                            </div>
-                            <a href="${item.path}" download style="color: var(--discord-muted);"><i class="fa-solid fa-download"></i></a>
-                        </div>
-                    `;
-                    if (isImg) content += `<div class="media-preview"><img src="${item.path}"></div>`;
-                    if (isVid) content += `<div class="media-preview"><video src="${item.path}" controls></video></div>`;
-                } else {
-                    try {
-                        const parsed = JSON.parse(item.content);
-                        if (parsed.type === 'chat_message') {
-                            author = parsed.author || 'Admin';
-                            content = parsed.content;
-                            avatarColor = '#5865f2';
-                            avatarInitial = author[0].toUpperCase();
-                        }
-                    } catch(e) {}
-                }
+                // Determine content type
+                let content = item.content || '';
+                let author = item.name || 'Webhook';
+                let avatarInitial = author[0] ? author[0].toUpperCase() : '?';
+                let avatarColor = '#5865f2'; // Discord Blurple
 
+                // Check for attachments (simple heuristic for now)
+                // If we implemented file uploads properly, we'd have a 'type' or 'attachments' field.
+                // Current backend stores file info in content if upload fails, or just text.
+                
                 html += `
                     <div class="message">
                         <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
                         <div class="msg-content">
                             <div class="msg-header">
-                                <span class="msg-author">${author} ${ip ? `[${ip}]` : ''}</span>
-                                <span class="msg-timestamp">${dateStr} ${timeStr}</span>
+                                <span class="msg-author">${author}</span>
+                                <span class="msg-timestamp">${dateStr}</span>
                             </div>
-                            <div class="msg-text">${content}</div>
+                            <div class="msg-text">${formatContent(content)}</div>
                         </div>
                     </div>
                 `;
             });
 
-            const shouldScroll = chatFeed.scrollTop + chatFeed.clientHeight >= chatFeed.scrollHeight - 100;
             chatFeed.innerHTML = html;
-            if (shouldScroll) chatFeed.scrollTop = chatFeed.scrollHeight;
+            // Scroll to bottom if needed (not perfect implementation but works for simple cases)
+            // chatFeed.scrollTop = chatFeed.scrollHeight; 
+        }
+
+        function formatContent(text) {
+            // Basic formatting for links, bold, etc.
+            if (!text) return '';
+            
+            // Replace newlines with <br>
+            let formatted = text.replace(/\n/g, '<br>');
+            
+            // Simple markdown bold **text**
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            
+            // Links
+            formatted = formatted.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#00a8fc;">$1</a>');
+            
+            return formatted;
         }
 
         async function sendChatMessage() {
-            const text = chatInput.value.trim();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
             if (!text) return;
-            
-            const originalValue = text;
-            chatInput.value = '';
-            chatInput.placeholder = "Sende...";
-            
+
+            input.value = '';
+            input.placeholder = 'Sende...';
+
             try {
-                const response = await fetch(`${API_BASE_URL}/webhook`, {
+                // Mimic Discord Webhook payload
+                const payload = {
+                    content: text,
+                    username: 'Admin',
+                    // avatar_url: '...' // Optional
+                };
+
+                const res = await fetch(`${API_BASE_URL}/webhook`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
-                        'X-Channel-Id': currentChannel 
+                        'X-Channel-Id': currentChannel // Custom header to route message to correct channel
                     },
-                    body: JSON.stringify({ 
-                        type: 'chat_message', 
-                        content: text, 
-                        author: 'Admin' 
-                    })
+                    body: JSON.stringify(payload)
                 });
-                
-                let result;
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.includes("application/json")) {
-                    result = await response.json();
-                } else {
-                    const errorText = await response.text();
-                    console.error("Server returned non-JSON:", errorText);
-                    if (errorText.includes("FUNCTION_INVOCATION_FAILED")) {
-                        result = { error: "Server-Funktion abgestürzt. Vercel Env Vars prüfen!" };
-                    } else if (errorText.includes("500")) {
-                        result = { error: "Server Error 500. Supabase Verbindung prüfen." };
-                    } else {
-                        result = { error: "Unbekannter Server-Fehler: " + errorText.substring(0, 50) };
-                    }
+
+                if (!res.ok && res.status !== 204) {
+                    throw new Error("Send failed: " + res.status);
                 }
-                
-                if (!response.ok) {
-                    throw new Error(result.error || result.details || "Senden fehlgeschlagen");
-                }
-                
-                await refreshChat();
+
+                // Success
+                refreshChat();
             } catch (err) {
-                console.error("Send error:", err);
-                chatInput.value = originalValue;
-                alert("Fehler: " + err.message);
+                alert("Fehler beim Senden: " + err.message);
+                input.value = text; // Restore text
             } finally {
-                chatInput.placeholder = `Nachricht an #${currentChannel}`;
-                chatInput.focus();
+                input.placeholder = `Nachricht an #${currentChannel}`;
+                input.focus();
             }
         }
 
         async function handleFileUpload(input) {
             if (!input.files[0]) return;
             const file = input.files[0];
-            await fetch(`${API_BASE_URL}/webhook`, {
-                method: 'POST',
-                headers: { 'X-File-Name': file.name, 'X-Channel-Id': currentChannel },
-                body: file
-            });
-            refreshChat();
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('username', 'Admin'); // Or 'FileBot'
+            // We can append content if we want a caption
+            
+            try {
+                const res = await fetch(`${API_BASE_URL}/webhook`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Channel-Id': currentChannel
+                    },
+                    body: formData // Fetch sets Content-Type to multipart/form-data automatically
+                });
+
+                if (!res.ok && res.status !== 204) {
+                    throw new Error("Upload failed");
+                }
+                
+                refreshChat();
+            } catch (err) {
+                alert("Fehler beim Upload: " + err.message);
+            }
+            
+            input.value = ''; // Reset
+        }
+
+        function setupEmojiPicker() {
+            const emojiBtn = document.getElementById('emoji-btn');
+            const emojiPicker = document.getElementById('emoji-picker');
+            const chatInput = document.getElementById('chat-input');
+            
+            try {
+                const picker = picmo.createPicker({ 
+                    rootElement: emojiPicker,
+                    theme: 'dark'
+                });
+                
+                emojiBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const isVisible = emojiPicker.style.display === 'block';
+                    emojiPicker.style.display = isVisible ? 'none' : 'block';
+                };
+
+                picker.addEventListener('emoji:select', (selection) => {
+                    chatInput.value += selection.emoji;
+                    emojiPicker.style.display = 'none';
+                    chatInput.focus();
+                });
+
+                document.onclick = (e) => {
+                    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+                        emojiPicker.style.display = 'none';
+                    }
+                };
+            } catch (e) {
+                console.warn("Emoji picker failed to load", e);
+            }
         }
     </script>
 </body>
