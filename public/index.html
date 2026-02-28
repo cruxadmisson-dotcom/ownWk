@@ -72,6 +72,7 @@
         .server-header:hover { background-color: rgba(255,255,255,0.05); }
         .channel-list { padding: 8px; flex: 1; overflow-y: auto; }
         
+        /* Categories */
         .channel-category { 
             padding: 18px 8px 4px 8px; 
             font-size: 12px; 
@@ -81,11 +82,17 @@
             display: flex; 
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
         }
-        .channel-category:hover .add-channel-btn { display: block; }
-        .add-channel-btn { display: block; cursor: pointer; color: var(--discord-text); }
+        .channel-category:hover { color: var(--discord-text); }
+        .category-content { display: block; } /* Can be collapsed */
+        .category-header-actions { display: none; gap: 4px; }
+        .channel-category:hover .category-header-actions { display: flex; }
+        .cat-action-btn { cursor: pointer; color: var(--discord-text); padding: 2px; }
+        .cat-action-btn:hover { color: white; }
 
-        .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; position: relative; }
+        .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; position: relative; margin-left: 0px; }
+        /* Indent slightly? Discord doesn't really indent channels under category much, maybe 8px? No, aligned left usually. */
         .channel-item:hover { background-color: var(--discord-hover); color: var(--discord-text); }
         .channel-item.active { background-color: var(--discord-selected); color: white; }
         .channel-item i { font-size: 18px; opacity: 0.6; }
@@ -504,43 +511,155 @@
             const container = document.getElementById('channels-container');
             container.innerHTML = '';
 
-            channels.forEach(channel => {
-                const isActive = channel.name === currentChannel;
-                const div = document.createElement('div');
-                div.className = `channel-item ${isActive ? 'active' : ''}`;
-                div.onclick = () => switchChannel(channel.name);
+            // Group channels by category (prefix)
+            const categories = { 'Textkanäle': [] }; // Default
+            
+            channels.forEach(ch => {
+                let cat = 'Textkanäle';
+                let name = ch.name;
                 
-                // Channel Actions (Edit & Delete)
-                let actionsHtml = '';
-                if (channel.name !== 'general') {
-                    actionsHtml = `
-                        <div class="channel-actions">
-                            <i class="fa-solid fa-pencil" onclick="editChannel('${channel.id}', '${channel.name}', event)" style="margin-right:6px;"></i>
-                            <i class="fa-solid fa-trash" onclick="deleteChannel('${channel.id}', event)"></i>
-                        </div>
-                    `;
+                if (ch.name.includes('/')) {
+                    const parts = ch.name.split('/');
+                    cat = parts[0];
+                    name = parts.slice(1).join('/'); // Allow nested? just take rest
                 }
-
-                div.innerHTML = `
-                    <i class="fa-solid fa-hashtag"></i>
-                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${channel.name}</span>
-                    ${actionsHtml}
-                `;
-                container.appendChild(div);
+                
+                if (!categories[cat]) categories[cat] = [];
+                categories[cat].push({ ...ch, displayName: name });
             });
+
+            // Render categories
+            for (const [catName, catChannels] of Object.entries(categories)) {
+                // Category Header
+                const catDiv = document.createElement('div');
+                catDiv.className = 'channel-category';
+                catDiv.innerHTML = `
+                    <span>${catName}</span>
+                    <div class="category-header-actions">
+                        <i class="fa-solid fa-plus cat-action-btn" onclick="openModal('${catName}')" title="Kanal erstellen"></i>
+                    </div>
+                `;
+                // Add DnD for Category? (Maybe later)
+                
+                container.appendChild(catDiv);
+                
+                // Channels
+                catChannels.forEach(channel => {
+                    const isActive = channel.name === currentChannel;
+                    const div = document.createElement('div');
+                    div.className = `channel-item ${isActive ? 'active' : ''}`;
+                    div.onclick = () => switchChannel(channel.name);
+                    
+                    // Draggable
+                    div.draggable = true;
+                    div.ondragstart = (e) => handleDragStart(e, channel.name);
+                    div.ondrop = (e) => handleDrop(e, channel.name);
+                    div.ondragover = (e) => e.preventDefault();
+
+                    // Channel Actions (Edit & Delete)
+                    let actionsHtml = '';
+                    if (channel.name !== 'general') {
+                        actionsHtml = `
+                            <div class="channel-actions">
+                                <i class="fa-solid fa-pencil" onclick="editChannel('${channel.id}', '${channel.name}', event)" style="margin-right:6px;"></i>
+                                <i class="fa-solid fa-trash" onclick="deleteChannel('${channel.id}', event)"></i>
+                            </div>
+                        `;
+                    }
+
+                    div.innerHTML = `
+                        <i class="fa-solid fa-hashtag"></i>
+                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${channel.displayName}</span>
+                        ${actionsHtml}
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            
+            // Add "Create Category" button at bottom of list
+            const createCatBtn = document.createElement('div');
+            createCatBtn.className = 'channel-item';
+            createCatBtn.style.opacity = '0.7';
+            createCatBtn.style.marginTop = '10px';
+            createCatBtn.innerHTML = `<i class="fa-solid fa-folder-plus"></i> <span>Kategorie erstellen</span>`;
+            createCatBtn.onclick = createCategory;
+            container.appendChild(createCatBtn);
         }
 
-        function switchChannel(name) {
-            currentChannel = name;
-            document.getElementById('current-channel-name').innerText = name;
-            document.getElementById('chat-input').placeholder = `Nachricht an #${name}`;
-            renderChannels(); // Re-render to update active state
-            refreshChat();
+        // DnD Logic
+        let draggedChannel = null;
+        function handleDragStart(e, name) {
+            draggedChannel = name;
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        
+        async function handleDrop(e, targetName) {
+            e.preventDefault();
+            if (draggedChannel === targetName) return;
+            
+            // Simple swap logic or move to category logic?
+            // To support "Move to category", we need to know the target category.
+            // But we don't have visual categories as drop targets easily unless we drop ON the category header.
+            // If dropping on a channel, we adopt that channel's category?
+            
+            const targetParts = targetName.split('/');
+            const targetCat = targetParts.length > 1 ? targetParts[0] : 'Textkanäle';
+            
+            const draggedParts = draggedChannel.split('/');
+            const draggedBaseName = draggedParts.length > 1 ? draggedParts.slice(1).join('/') : draggedChannel;
+            
+            // Construct new name
+            let newName = targetCat === 'Textkanäle' ? draggedBaseName : `${targetCat}/${draggedBaseName}`;
+            
+            if (newName === draggedChannel) return; // No change
+            
+            if (!confirm(`Kanal verschieben zu "${targetCat}"?`)) return;
+            
+            // Find ID
+            const ch = channels.find(c => c.name === draggedChannel);
+            if (!ch) return;
+            
+            try {
+                await fetch(`${API_BASE_URL}/channels/${ch.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName })
+                });
+                await loadChannels();
+                if (currentChannel === draggedChannel) switchChannel(newName);
+            } catch(e) {
+                alert("Fehler beim Verschieben: " + e.message);
+            }
         }
 
-        function openModal() {
+        async function createCategory() {
+            const name = prompt("Name der neuen Kategorie:");
+            if (!name) return;
+            // We don't really "create" a category in DB, we just need a channel in it?
+            // Or we just display it if we create a channel with that prefix.
+            // Let's prompt to create a channel IN that category immediately to persist it.
+            
+            const firstChannel = prompt(`Erster Kanal in "${name}":`);
+            if (!firstChannel) return;
+            
+            const fullName = `${name}/${firstChannel}`;
+            // Create channel logic reuse
+            try {
+                const res = await fetch(`${API_BASE_URL}/channels`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: fullName.toLowerCase().replace(/\s+/g, '-') })
+                });
+                if(!res.ok) throw new Error("Failed");
+                await loadChannels();
+            } catch(e) { alert(e.message); }
+        }
+
+        function openModal(prefillCategory = null) {
             document.getElementById('create-channel-modal').style.display = 'flex';
-            document.getElementById('new-channel-name').focus();
+            const input = document.getElementById('new-channel-name');
+            input.value = prefillCategory && prefillCategory !== 'Textkanäle' ? `${prefillCategory}/` : '';
+            input.focus();
         }
 
         function closeModal() {
@@ -550,6 +669,7 @@
 
         async function createChannel() {
             const nameInput = document.getElementById('new-channel-name');
+            // Allow '/' in name for category
             const name = nameInput.value.trim().toLowerCase().replace(/\s+/g, '-');
             
             if (!name) return;
@@ -691,7 +811,7 @@
 
                 const msgHtmlContent = `
                         <div class="msg-actions">
-                            <div class="msg-action-btn" onclick="addReaction('${item.id}')" title="Reaktion hinzufügen"><i class="fa-solid fa-face-smile"></i></div>
+                            <div class="msg-action-btn" onclick="openReactionPicker(event, '${item.id}')" title="Reaktion hinzufügen"><i class="fa-solid fa-face-smile"></i></div>
                             <div class="msg-action-btn" onclick="editMessage('${item.id}', '${content.replace(/'/g, "\\'")}')" title="Bearbeiten"><i class="fa-solid fa-pencil"></i></div>
                             <div class="msg-action-btn danger" onclick="deleteMessage('${item.id}')" title="Löschen"><i class="fa-solid fa-trash"></i></div>
                         </div>
@@ -704,7 +824,7 @@
                             <div class="msg-text">${formatContent(content)}</div>
                             <div class="reactions-container" id="reactions-${item.id}">
                                 ${renderReactions(item.headers, item.id)}
-                                <div class="reaction-item add-reaction-btn" onclick="addReaction('${item.id}')" title="Reagieren">
+                                <div class="reaction-item add-reaction-btn" onclick="openReactionPicker(event, '${item.id}')" title="Reagieren">
                                     <i class="fa-solid fa-plus" style="font-size: 10px;"></i>
                                     <i class="fa-solid fa-face-smile" style="font-size: 12px;"></i>
                                 </div>
@@ -774,32 +894,18 @@
         }
 
         async function addReaction(id, emoji = null) {
-            if (!emoji) {
-                emoji = prompt("Emoji eingeben (z.B. 👍):");
-            }
+            // Logic handled by picker callback if no emoji passed (but we guard against it now)
             if (!emoji) return;
 
-            // Optimistic update (client-side first)
+            // Optimistic update
             const reactionContainer = document.getElementById(`reactions-${id}`);
-            // Fetch current reactions from DOM or re-fetch? 
-            // Better to re-fetch or keep state. For simplicity, we fetch the message or just send update.
-            // Since we don't have atomic increment in this simple setup, we read-modify-write.
-            // Actually, let's just use the current state from the DOM or memory if possible.
-            // But we need the full map.
+            // We can optimistic append to DOM if we want instant feedback before fetch
+            // But complex to sync. Let's trust the re-fetch.
+            // Actually, user complained it doesn't add.
+            // Let's debug: console.log("Adding reaction", id, emoji);
             
-            // Re-fetching message list is heavy. Let's try to patch blindly? No, we need current count.
-            // Let's fetch the specific message first (not implemented efficiently).
-            // Workaround: We find the message in the `channels` array? No, `renderMessages` doesn't store state globally.
-            // Let's just re-fetch the list silently to get latest state, then update.
-            // Or easier: Just send the new map. But we need the old map.
-            
-            // Let's grab it from the DOM for now (hacky but works for simple app)
-            // Actually, the `headers` attribute is not in DOM.
-            // We will fetch the single message via list filter? No, list returns all.
-            
-            // Better approach: Server handles increment? Our server is dumb.
-            // Okay, let's just do a fetch of the list, find the msg, update, and patch.
             try {
+                // Fetch CURRENT state first to not overwrite others
                 const resList = await fetch(`${API_BASE_URL}/list?channelId=${currentChannel}`);
                 const data = await resList.json();
                 const msg = data.find(m => m.id == id);
@@ -818,10 +924,13 @@
                 });
                 
                 if (!resPatch.ok) throw new Error("Reaction failed");
+                
+                // Refresh immediately
                 refreshChat();
                 
             } catch(e) {
                 console.error(e);
+                alert("Reaktion fehlgeschlagen: " + e.message);
             }
         }
 
@@ -1238,6 +1347,9 @@
             }
         }
 
+        // Global state for reaction picker
+        let activeReactionMsgId = null;
+
         function setupEmojiPicker() {
             const emojiBtn = document.getElementById('emoji-btn');
             const emojiPicker = document.getElementById('emoji-picker');
@@ -1249,27 +1361,76 @@
                     theme: 'dark'
                 });
                 
+                // Toggle picker for Chat Input
                 emojiBtn.onclick = (e) => {
                     e.stopPropagation();
+                    activeReactionMsgId = null; // Reset reaction mode
                     const isVisible = emojiPicker.style.display === 'block';
+                    // Position for chat input
+                    emojiPicker.style.bottom = '60px';
+                    emojiPicker.style.top = 'auto';
+                    emojiPicker.style.left = 'auto';
+                    emojiPicker.style.right = '0';
                     emojiPicker.style.display = isVisible ? 'none' : 'block';
                 };
 
                 picker.addEventListener('emoji:select', (selection) => {
-                    chatInput.value += selection.emoji;
-                    emojiPicker.style.display = 'none';
-                    chatInput.focus();
+                    if (activeReactionMsgId) {
+                        // We are picking a reaction for a message
+                        addReaction(activeReactionMsgId, selection.emoji);
+                        activeReactionMsgId = null;
+                        emojiPicker.style.display = 'none';
+                    } else {
+                        // We are typing in chat
+                        chatInput.value += selection.emoji;
+                        chatInput.focus();
+                        // Don't close picker immediately for chat typing? Or yes? Discord keeps it open usually but let's close for simplicity
+                        // emojiPicker.style.display = 'none'; 
+                    }
                 });
 
                 document.onclick = (e) => {
-                    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+                    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn && !e.target.closest('.add-reaction-btn') && !e.target.closest('.msg-action-btn')) {
                         emojiPicker.style.display = 'none';
+                        activeReactionMsgId = null;
                     }
                 };
             } catch (e) {
                 console.warn("Emoji picker failed to load", e);
             }
         }
+
+        // Open picker for reaction
+        function openReactionPicker(event, msgId) {
+            event.stopPropagation();
+            activeReactionMsgId = msgId;
+            const emojiPicker = document.getElementById('emoji-picker');
+            
+            // Position near the mouse click
+            // Simple positioning
+            emojiPicker.style.display = 'block';
+            
+            // Adjust position to not go off screen
+            const rect = event.target.getBoundingClientRect();
+            // Position bottom-right of click, or center screen if mobile
+            // Let's just fix it to center for reaction to be safe
+            emojiPicker.style.top = Math.min(window.innerHeight - 350, Math.max(10, rect.top)) + 'px';
+            emojiPicker.style.left = Math.min(window.innerWidth - 320, Math.max(10, rect.left)) + 'px';
+            emojiPicker.style.bottom = 'auto';
+            emojiPicker.style.right = 'auto';
+        }
+
+        async function addReaction(id, emoji = null) {
+            // If called from button click without emoji, open picker
+            if (!emoji) {
+                // We need the event to position picker, but `addReaction` signature in HTML is `addReaction('id')`
+                // We can change the onclick in HTML to pass event: `addReaction('id', null, event)`
+                // But easier: just use the global picker logic if I can hook it up.
+                // Let's rely on the updated HTML calling `openReactionPicker` instead of `addReaction` directly for the button.
+                return; 
+            }
+
+            // ... rest of logic ...
     </script>
 </body>
 </html>
