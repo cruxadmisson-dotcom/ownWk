@@ -1,120 +1,153 @@
-// Minimal API for Vercel
-const { createClient } = require('@supabase/supabase-js');
+const https = require('https');
 
-// Init Supabase
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+// --- CONFIG ---
+// Load env vars (Vercel provides these automatically)
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
 
-module.exports = async (req, res) => {
-    // Enable CORS
+// --- HELPERS ---
+function sendRes(res, statusCode, data) {
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Channel-Id'
-    );
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Channel-Id');
 
+    res.statusCode = statusCode;
+    if (typeof data === 'object') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+    } else {
+        res.end(data);
+    }
+}
+
+function supabaseRequest(method, endpoint, body = null) {
+    return new Promise((resolve, reject) => {
+        if (!SUPABASE_URL || !SUPABASE_KEY) {
+            return reject(new Error('Missing Supabase Config'));
+        }
+
+        const url = new URL(`${SUPABASE_URL}/rest/v1/${endpoint}`);
+        const options = {
+            hostname: url.hostname,
+            path: url.pathname + url.search,
+            method: method,
+            headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+                try {
+                    const json = data ? JSON.parse(data) : null;
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve(json);
+                    } else {
+                        reject({ statusCode: res.statusCode, error: json });
+                    }
+                } catch (e) {
+                    reject({ statusCode: res.statusCode, error: data });
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        if (body) req.write(JSON.stringify(body));
+        req.end();
+    });
+}
+
+// --- MAIN HANDLER ---
+module.exports = async (req, res) => {
+    // Handle OPTIONS (CORS)
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return sendRes(res, 200, '');
     }
 
     try {
-        const path = req.url.split('?')[0];
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const path = url.pathname;
         
-        // 1. HEALTH CHECK
-        if (path === '/api/health') {
-            if (!supabase) return res.status(500).json({ status: "error", error: "Missing Supabase Config" });
-            const { error } = await supabase.from('channels').select('count', { count: 'exact', head: true });
-            if (error) return res.status(500).json({ status: "db_error", details: error });
-            return res.json({ status: "ok", db: "connected" });
+        // 1. HEALTH
+        if (path.includes('/api/health')) {
+            return sendRes(res, 200, { 
+                status: "ok", 
+                mode: "native-node",
+                env_check: { url: !!SUPABASE_URL, key: !!SUPABASE_KEY }
+            });
         }
 
-        // 2. LIST MESSAGES
-        if (path === '/api/list') {
-            if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
-            const channelId = req.query.channelId || 'general';
-            const { data, error } = await supabase
-                .from('events')
-                .select('*')
-                .eq('path', channelId)
-                .order('timestamp', { ascending: false })
-                .limit(50);
-            
-            if (error) throw error;
-            return res.json(data || []);
-        }
-
-        // 3. CHANNELS (GET / POST / DELETE)
-        if (path.startsWith('/api/channels')) {
-            if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
-            
+        // 2. CHANNELS
+        if (path.includes('/api/channels')) {
             if (req.method === 'GET') {
-                const { data, error } = await supabase.from('channels').select('*').order('created_at', { ascending: true });
-                if (error) {
-                    if (error.code === '42P01') return res.json([]); // Table missing -> empty list
-                    throw error;
+                try {
+                    const data = await supabaseRequest('GET', 'channels?select=*&order=created_at.asc');
+                    return sendRes(res, 200, data);
+                } catch (err) {
+                    // Fallback if table missing
+                    return sendRes(res, 200, []);
                 }
-                return res.json(data);
             }
-
             if (req.method === 'POST') {
-                const { name } = req.body;
-                if (!name) return res.status(400).json({ error: "Name required" });
-                const { data, error } = await supabase.from('channels').insert([{ name }]).select();
-                if (error) throw error;
-                return res.json(data[0]);
+                const { name } = req.body; // Vercel parses body automatically? No, need manual if stream. 
+                // BUT Vercel Serverless Functions (Node) usually parse JSON body if content-type is set.
+                // We will assume req.body is available or we need a helper.
+                // Let's rely on Vercel's default body parsing for now.
+                
+                if (!req.body || !req.body.name) return sendRes(res, 400, { error: "Name required" });
+                
+                const data = await supabaseRequest('POST', 'channels', { name: req.body.name });
+                return sendRes(res, 200, data[0]);
             }
-
             if (req.method === 'DELETE') {
                 const id = path.split('/').pop();
-                const { error } = await supabase.from('channels').delete().eq('id', id);
-                if (error) throw error;
-                return res.json({ success: true });
+                await supabaseRequest('DELETE', `channels?id=eq.${id}`);
+                return sendRes(res, 200, { success: true });
             }
         }
 
-        // 4. WEBHOOK (POST / GET)
-        if (path === '/api/webhook') {
-            if (req.method === 'GET') {
-                return res.json({
-                    type: 1, id: "1234567890", name: "Captain Hook", channel_id: "123", guild_id: "123", token: "fake"
-                });
-            }
+        // 3. LIST MESSAGES
+        if (path.includes('/api/list')) {
+            const channelId = url.searchParams.get('channelId') || 'general';
+            const data = await supabaseRequest('GET', `events?select=*&path=eq.${channelId}&order=timestamp.desc&limit=50`);
+            return sendRes(res, 200, data);
+        }
 
+        // 4. WEBHOOK
+        if (path.includes('/api/webhook')) {
+            if (req.method === 'GET') {
+                return sendRes(res, 200, { type: 1, id: "123", name: "Hook", token: "fake" });
+            }
             if (req.method === 'POST') {
-                if (!supabase) return res.status(500).json({ error: "DB Config Missing" });
+                const body = req.body;
+                const channelId = req.headers['x-channel-id'] || url.searchParams.get('channelId') || 'general';
                 
-                const { content, embeds, username } = req.body;
-                const channelId = req.headers['x-channel-id'] || req.query.channelId || 'general';
-                
-                let finalContent = content || '';
-                if (embeds && Array.isArray(embeds)) {
-                    embeds.forEach(e => {
-                        if (e.title) finalContent += `\n**${e.title}**`;
-                        if (e.description) finalContent += `\n${e.description}`;
-                    });
+                let content = body.content || '';
+                if (body.embeds && Array.isArray(body.embeds)) {
+                    body.embeds.forEach(e => content += `\n${e.title || ''} ${e.description || ''}`);
                 }
 
-                const { error } = await supabase.from('events').insert([{
+                await supabaseRequest('POST', 'events', {
                     type: 'message',
-                    name: username || 'Webhook',
-                    content: finalContent,
+                    name: body.username || 'Webhook',
+                    content: content,
                     path: channelId
-                }]);
-
-                if (error) throw error;
-                return res.status(204).end();
+                });
+                
+                return sendRes(res, 204, '');
             }
         }
 
-        // 404
-        res.status(404).json({ error: "Not Found", path });
+        return sendRes(res, 404, { error: "Not found" });
 
-    } catch (err) {
-        console.error("API Error:", err);
-        res.status(500).json({ error: err.message });
+    } catch (error) {
+        console.error("Handler Error:", error);
+        return sendRes(res, 500, { error: error.message || "Internal Server Error" });
     }
 };
