@@ -442,11 +442,17 @@
         // Initialize
         window.onload = async () => {
             // Check auth
-            if (localStorage.getItem('discord_auth') === 'crux1500300636!') {
+            // Debug: Clear old invalid auth if any
+            // localStorage.removeItem('discord_auth'); 
+            
+            const storedAuth = localStorage.getItem('discord_auth');
+            if (storedAuth && storedAuth.trim() === 'crux1500300636!') {
                 initApp();
             } else {
                 // Show login
                 document.getElementById('login-overlay').style.display = 'flex';
+                // Focus password input
+                document.getElementById('login-password').focus();
             }
         };
 
@@ -455,22 +461,40 @@
         }
 
         function login() {
-            const pass = document.getElementById('login-password').value;
-            // Trim whitespace to avoid copy-paste errors
+            const input = document.getElementById('login-password');
+            const pass = input.value; // Don't trim yet to check exactly what user types if needed, but we should trim.
+            
+            console.log("Attempting login..."); // Debug log
+            
+            // Hardcoded check
             if (pass.trim() === 'crux1500300636!') {
+                console.log("Login success");
                 localStorage.setItem('discord_auth', 'crux1500300636!');
-                document.getElementById('login-overlay').style.display = 'none';
+                
+                // Hide overlay
+                const overlay = document.getElementById('login-overlay');
+                overlay.style.display = 'none';
+                
+                // Initialize
                 initApp();
             } else {
+                console.log("Login failed");
                 const err = document.getElementById('login-error');
                 err.innerText = "Dont try it My Brother Get out Black Ass dawg";
                 err.style.display = 'block';
                 err.style.fontSize = '18px';
                 err.style.fontWeight = 'bold';
+                
+                // Clear input
+                input.value = '';
+                input.focus();
+                
                 // Shake animation
                 const box = document.querySelector('.login-box');
+                // Reset animation to trigger reflow
+                box.style.animation = 'none';
+                box.offsetHeight; /* trigger reflow */
                 box.style.animation = 'shake 0.5s';
-                setTimeout(() => box.style.animation = '', 500);
             }
         }
 
