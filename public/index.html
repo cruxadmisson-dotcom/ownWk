@@ -50,7 +50,7 @@
             align-items: center;
         }
         .channel-category:hover .add-channel-btn { display: block; }
-        .add-channel-btn { display: none; cursor: pointer; color: var(--discord-text); }
+        .add-channel-btn { display: block; cursor: pointer; color: var(--discord-text); }
 
         .channel-item { height: 34px; padding: 0 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s; color: var(--discord-muted); margin-bottom: 2px; position: relative; }
         .channel-item:hover { background-color: var(--discord-hover); color: var(--discord-text); }
@@ -59,6 +59,31 @@
         .channel-actions { display: none; margin-left: auto; color: var(--discord-muted); }
         .channel-item:hover .channel-actions { display: block; }
         .channel-actions i:hover { color: #f23f43; }
+
+        /* Message Actions */
+        .message { position: relative; display: flex; gap: 16px; padding: 2px 16px; margin-top: 1.0625rem; }
+        .message:hover { background-color: rgba(0,0,0,0.04); }
+        .message:hover .msg-actions { display: flex; }
+        
+        .msg-actions {
+            display: none;
+            position: absolute;
+            top: -10px;
+            right: 16px;
+            background-color: var(--discord-dark);
+            border: 1px solid var(--discord-darker);
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+        .msg-action-btn {
+            padding: 6px 10px;
+            cursor: pointer;
+            color: var(--discord-muted);
+            transition: 0.2s;
+        }
+        .msg-action-btn:hover { background-color: var(--discord-hover); color: var(--discord-text); }
+        .msg-action-btn.danger:hover { color: #f23f43; }
 
         /* User Panel (Bottom Left) */
         .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
@@ -395,7 +420,11 @@
                 // Current backend stores file info in content if upload fails, or just text.
                 
                 html += `
-                    <div class="message">
+                    <div class="message" id="msg-${item.id}">
+                        <div class="msg-actions">
+                            <div class="msg-action-btn" onclick="editMessage('${item.id}', '${content.replace(/'/g, "\\'")}')"><i class="fa-solid fa-pencil"></i></div>
+                            <div class="msg-action-btn danger" onclick="deleteMessage('${item.id}')"><i class="fa-solid fa-trash"></i></div>
+                        </div>
                         <div class="msg-avatar" style="background-color: ${avatarColor}">${avatarInitial}</div>
                         <div class="msg-content">
                             <div class="msg-header">
@@ -498,6 +527,34 @@
             }
             
             input.value = ''; // Reset
+        }
+
+        async function deleteMessage(id) {
+            if(!confirm("Nachricht löschen?")) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/messages/${id}`, { method: 'DELETE' });
+                if(!res.ok) throw new Error("Delete failed");
+                refreshChat();
+            } catch(e) {
+                alert(e.message);
+            }
+        }
+
+        async function editMessage(id, oldContent) {
+            const newContent = prompt("Nachricht bearbeiten:", oldContent);
+            if(newContent === null || newContent === oldContent) return;
+            
+            try {
+                const res = await fetch(`${API_BASE_URL}/messages/${id}`, { 
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: newContent })
+                });
+                if(!res.ok) throw new Error("Edit failed");
+                refreshChat();
+            } catch(e) {
+                alert(e.message);
+            }
         }
 
         function setupEmojiPicker() {

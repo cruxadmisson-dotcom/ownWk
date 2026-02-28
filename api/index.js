@@ -119,6 +119,22 @@ module.exports = async (req, res) => {
             return sendRes(res, 200, data);
         }
 
+        // 3.1 MESSAGE MANAGEMENT
+        if (path.includes('/api/messages')) {
+            const id = path.split('/').pop();
+            
+            if (req.method === 'DELETE') {
+                await supabaseRequest('DELETE', `events?id=eq.${id}`);
+                return sendRes(res, 200, { success: true });
+            }
+
+            if (req.method === 'PATCH') {
+                const { content } = req.body;
+                await supabaseRequest('PATCH', `events?id=eq.${id}`, { content });
+                return sendRes(res, 200, { success: true });
+            }
+        }
+
         // 4. WEBHOOK
         if (path.includes('/api/webhook')) {
             if (req.method === 'GET') {
