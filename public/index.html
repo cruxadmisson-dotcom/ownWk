@@ -414,10 +414,15 @@
         // --- Chat & Messages ---
 
         async function refreshChat() {
+            // If user is actively playing a video, skip refresh to prevent interruption
+            // Simple check: is there a video element that is not paused?
+            const videos = document.querySelectorAll('video');
+            for (let v of videos) {
+                if (!v.paused) return; 
+            }
+
             try {
                 // Fetch all messages for current channel
-                // Note: The API should ideally filter by channel, currently fetching all and filtering client-side or server-side?
-                // Our new API supports ?channelId=...
                 const res = await fetch(`${API_BASE_URL}/list?channelId=${currentChannel}`);
                 
                 if (!res.ok) {
@@ -454,35 +459,36 @@
                 return;
             }
 
-            // Sort by timestamp ascending (oldest first) for chat flow
-            // But API returns newest first (desc). So we reverse.
+            // Sort by timestamp ascending (oldest first)
             const sorted = [...data].reverse();
 
-            let html = `
-                <div class="welcome-section">
-                    <div class="welcome-hash">#</div>
-                    <h1 class="welcome-title">Willkommen bei #${currentChannel}!</h1>
-                    <p class="welcome-subtitle">Das ist der Beginn des Kanals #${currentChannel}.</p>
-                </div>
-            `;
+            // Check if we need to full re-render (e.g. channel switch or first load)
+            // Or if we can just append/update.
+            // For simplicity and stability with videos, we will use a "smart update" approach manually.
+            
+            // 1. Ensure welcome section exists if empty
+            if (!chatFeed.querySelector('.welcome-section')) {
+                chatFeed.innerHTML = `
+                    <div class="welcome-section">
+                        <div class="welcome-hash">#</div>
+                        <h1 class="welcome-title">Willkommen bei #${currentChannel}!</h1>
+                        <p class="welcome-subtitle">Das ist der Beginn des Kanals #${currentChannel}.</p>
+                    </div>
+                `;
+            }
 
+            // 2. Iterate and update/append
             sorted.forEach(item => {
+                const existingMsg = document.getElementById(`msg-${item.id}`);
+                
                 const ts = new Date(item.timestamp);
-                // Formatting: "Today at 4:20 PM" style is complex, using simple locale for now
                 const dateStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-                // Determine content type
                 let content = item.content || '';
                 let author = item.name || 'Webhook';
                 let avatarInitial = author[0] ? author[0].toUpperCase() : '?';
-                let avatarColor = '#5865f2'; // Discord Blurple
+                let avatarColor = '#5865f2'; 
 
-                // Check for attachments (simple heuristic for now)
-                // If we implemented file uploads properly, we'd have a 'type' or 'attachments' field.
-                // Current backend stores file info in content if upload fails, or just text.
-                
-                html += `
-                    <div class="message" id="msg-${item.id}">
+                const msgHtmlContent = `
                         <div class="msg-actions">
                             <div class="msg-action-btn" onclick="editMessage('${item.id}', '${content.replace(/'/g, "\\'")}')"><i class="fa-solid fa-pencil"></i></div>
                             <div class="msg-action-btn danger" onclick="deleteMessage('${item.id}')"><i class="fa-solid fa-trash"></i></div>
@@ -495,13 +501,40 @@
                             </div>
                             <div class="msg-text">${formatContent(content)}</div>
                         </div>
-                    </div>
                 `;
+
+                if (existingMsg) {
+                    // Check if content changed (to avoid re-rendering playing videos if not needed)
+                    // We can store a hash or raw content in a data attribute to compare
+                    const currentRaw = existingMsg.getAttribute('data-raw-content');
+                    if (currentRaw !== content) {
+                        existingMsg.innerHTML = msgHtmlContent;
+                        existingMsg.setAttribute('data-raw-content', content);
+                    }
+                } else {
+                    // Append new
+                    const div = document.createElement('div');
+                    div.className = 'message';
+                    div.id = `msg-${item.id}`;
+                    div.setAttribute('data-raw-content', content);
+                    div.innerHTML = msgHtmlContent;
+                    chatFeed.appendChild(div);
+                    // Auto-scroll to bottom on new message
+                    chatFeed.scrollTop = chatFeed.scrollHeight; 
+                }
             });
 
-            chatFeed.innerHTML = html;
-            // Scroll to bottom if needed (not perfect implementation but works for simple cases)
-            // chatFeed.scrollTop = chatFeed.scrollHeight; 
+            // 3. Cleanup deleted messages
+            // Get all message IDs from DOM
+            const domIds = Array.from(chatFeed.querySelectorAll('.message')).map(el => el.id.replace('msg-', ''));
+            const dataIds = new Set(sorted.map(item => String(item.id)));
+            
+            domIds.forEach(id => {
+                if (!dataIds.has(id)) {
+                    const el = document.getElementById(`msg-${id}`);
+                    if (el) el.remove();
+                }
+            });
         }
 
         function formatContent(text) {
