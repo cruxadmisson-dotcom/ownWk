@@ -150,7 +150,7 @@ app.get('/api/channels', async (req, res) => {
         res.json(data);
     } catch (error) {
         console.error('Channels Error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message, code: error.code, details: error.details, hint: error.hint });
     }
 });
 
@@ -194,6 +194,36 @@ app.delete('/api/channels/:id', async (req, res) => {
         console.error('Delete Channel Error:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// 7. GET /api/health - Diagnostic
+app.get('/api/health', async (req, res) => {
+    const status = {
+        env: {
+            SUPABASE_URL: !!supabaseUrl,
+            SUPABASE_KEY: !!supabaseKey
+        },
+        db: 'unknown'
+    };
+    
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.from('channels').select('count', { count: 'exact', head: true });
+            if (error) {
+                status.db = 'error';
+                status.details = error;
+            } else {
+                status.db = 'connected';
+            }
+        } catch (e) {
+            status.db = 'exception';
+            status.details = e.message;
+        }
+    } else {
+        status.db = 'not_initialized';
+    }
+    
+    res.json(status);
 });
 
 // Export the app for Vercel

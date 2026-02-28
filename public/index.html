@@ -334,9 +334,14 @@
                 const res = await fetch(`${API_BASE_URL}/list?channelId=${currentChannel}`);
                 
                 if (!res.ok) {
-                    // Handle Vercel errors or 500s
+                    const errText = await res.text();
+                    try {
+                        const errJson = JSON.parse(errText);
+                        document.getElementById('error-text').innerText = `Fehler: ${errJson.error || errText}`;
+                    } catch (e) {
+                        document.getElementById('error-text').innerText = `Server Fehler: ${res.status} ${res.statusText}`;
+                    }
                     document.getElementById('error-banner').style.display = 'block';
-                    document.getElementById('error-text').innerText = "Verbindung zum Server unterbrochen.";
                     return;
                 }
                 
@@ -450,7 +455,8 @@
                 });
 
                 if (!res.ok && res.status !== 204) {
-                    throw new Error("Send failed: " + res.status);
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || `Send failed: ${res.status}`);
                 }
 
                 // Success
