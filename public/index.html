@@ -100,47 +100,44 @@
         .file-attachment {
             display: flex; 
             align-items: center; 
-            gap: 12px;
+            gap: 10px;
             background-color: #2b2d31; 
-            border: 1px solid #232428;
-            padding: 10px 12px; 
+            border: 1px solid #1e1f22; /* More subtle border */
+            padding: 10px; 
             border-radius: 4px; 
             margin-top: 6px;
-            max-width: 400px;
             width: fit-content;
+            max-width: 100%;
         }
         
         .file-icon { 
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 40px; /* Taller rectangular icon shape */
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            color: #dbdee1;
-            font-size: 24px;
+            font-size: 34px; /* Larger icon */
         }
+        
         /* Make generic file icon look like the screenshot (light blue-ish document) */
         .file-icon i {
-            color: #aeb4e6; /* Light purple/blue tint like in screenshot */
+            color: #dcddef; /* Very light purple/blue tint like in screenshot */
         }
         
         .file-info { 
-            flex: 1; 
-            overflow: hidden; 
             display: flex;
             flex-direction: column;
             justify-content: center;
+            gap: 2px;
         }
         
         .file-name { 
             color: #00a8fc; /* Discord Link Blue */
             font-weight: 500; 
             font-size: 15px;
-            line-height: 1.2;
+            line-height: 1.1;
             white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
             text-decoration: none;
         }
         .file-name:hover {
@@ -150,8 +147,7 @@
         .file-size { 
             font-size: 12px; 
             color: #b5bac1; /* Lighter gray */
-            line-height: 1.2;
-            margin-top: 2px;
+            line-height: 1.1;
         }
         
         /* Remove the separate download button on the right, make name clickable */
