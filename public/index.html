@@ -85,6 +85,33 @@
         .msg-action-btn:hover { background-color: var(--discord-hover); color: var(--discord-text); }
         .msg-action-btn.danger:hover { color: #f23f43; }
 
+        /* Media & File Styles */
+        .media-wrapper { position: relative; display: inline-block; max-width: 100%; margin-top: 6px; }
+        .media-wrapper img, .media-wrapper video { max-width: 100%; max-height: 350px; border-radius: 6px; display: block; }
+        .media-download-btn {
+            position: absolute; top: 6px; right: 6px;
+            background: rgba(0,0,0,0.6); color: white;
+            padding: 4px 8px; border-radius: 4px;
+            cursor: pointer; opacity: 0; transition: 0.2s;
+            text-decoration: none; font-size: 14px;
+        }
+        .media-wrapper:hover .media-download-btn { opacity: 1; }
+
+        .file-attachment {
+            display: flex; align-items: center; gap: 10px;
+            background-color: #2f3136; border: 1px solid #202225;
+            padding: 10px; border-radius: 5px; margin-top: 6px;
+            max-width: 400px;
+        }
+        .file-icon { font-size: 24px; color: var(--discord-text); }
+        .file-info { flex: 1; overflow: hidden; }
+        .file-name { color: #00a8fc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-size { font-size: 12px; color: var(--discord-muted); }
+        .file-download-btn {
+            color: var(--discord-muted); cursor: pointer; padding: 8px; transition: 0.2s;
+        }
+        .file-download-btn:hover { color: white; background-color: rgba(255,255,255,0.1); border-radius: 4px; }
+
         /* User Panel (Bottom Left) */
         .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
         .user-avatar { width: 32px; height: 32px; border-radius: 50%; background-color: #5865f2; position: relative; }
@@ -478,27 +505,58 @@
         }
 
         function formatContent(text) {
-            // Basic formatting for links, bold, etc.
             if (!text) return '';
             
-            // Handle Images (Markdown syntax: ![alt](url))
-            // Regex for images (starts with data:image/)
-            text = text.replace(/!\[(.*?)\]\((data:image\/.*?;base64,.*?)\)/g, '<br><img src="$2" style="max-width:100%; max-height:300px; border-radius:4px; margin-top:8px;">');
-            
-            // Handle Videos (Markdown syntax: ![video:alt](url))
-            // Regex for videos (starts with data:video/)
-            text = text.replace(/!\[video:(.*?)\]\((data:video\/.*?;base64,.*?)\)/g, '<br><video controls src="$2" style="max-width:100%; max-height:300px; border-radius:4px; margin-top:8px;"></video>');
+            // Helper to extract info from markdown-like syntax: ![type:name|size](data)
+            const parseMedia = (str, type) => {
+                const regex = new RegExp(`!\\[${type}:(.*?)\\|(.*?)\\]\\((data:.*?)\\)`, 'g');
+                return str.replace(regex, (match, name, size, data) => {
+                    const downloadAttr = `href="${data}" download="${name}"`;
+                    
+                    if (type === 'image') {
+                        return `
+                            <div class="media-wrapper">
+                                <img src="${data}" alt="${name}">
+                                <a ${downloadAttr} class="media-download-btn" title="Download"><i class="fa-solid fa-download"></i></a>
+                            </div>
+                        `;
+                    }
+                    if (type === 'video') {
+                        return `
+                            <div class="media-wrapper">
+                                <video controls src="${data}"></video>
+                                <a ${downloadAttr} class="media-download-btn" title="Download"><i class="fa-solid fa-download"></i></a>
+                            </div>
+                        `;
+                    }
+                    if (type === 'file') {
+                        return `
+                            <div class="file-attachment">
+                                <div class="file-icon"><i class="fa-solid fa-file-lines"></i></div>
+                                <div class="file-info">
+                                    <div class="file-name">${name}</div>
+                                    <div class="file-size">${size}</div>
+                                </div>
+                                <a ${downloadAttr} class="file-download-btn" title="Download"><i class="fa-solid fa-download"></i></a>
+                            </div>
+                        `;
+                    }
+                    return match;
+                });
+            };
 
-            // Replace newlines with <br>
+            // Process custom media tags
+            text = parseMedia(text, 'image');
+            text = parseMedia(text, 'video');
+            text = parseMedia(text, 'file');
+
+            // Legacy format fallback (for old messages)
+            text = text.replace(/!\[(.*?)\]\((data:image\/.*?;base64,.*?)\)/g, '<br><div class="media-wrapper"><img src="$2" style="max-width:100%; max-height:300px; border-radius:4px;"><a href="$2" download="$1" class="media-download-btn"><i class="fa-solid fa-download"></i></a></div>');
+            text = text.replace(/!\[video:(.*?)\]\((data:video\/.*?;base64,.*?)\)/g, '<br><div class="media-wrapper"><video controls src="$2" style="max-width:100%; max-height:300px; border-radius:4px;"></video><a href="$2" download="$1" class="media-download-btn"><i class="fa-solid fa-download"></i></a></div>');
+
+            // Standard Markdown & Links
             let formatted = text.replace(/\n/g, '<br>');
-            
-            // Simple markdown bold **text**
             formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-            
-            // Links (http/https) - Avoid replacing data URIs inside src attributes
-            // We use a negative lookbehind to ensure we don't match links inside src="..."
-            // Simplified: match links that are NOT preceded by ( or " or '
-            // This is tricky with regex. Better to rely on the browser's renderer or a library, but for now:
             formatted = formatted.replace(/(?<!src="|src='|href="|href='|\()((https?):\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#00a8fc;">$1</a>');
             
             return formatted;
@@ -563,19 +621,19 @@
                 const isImage = file.type.startsWith('image/');
                 
                 // Construct Markdown content
-                let content = `**Dateiupload:** ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+                let content = ``; // Start empty, media/files handle themselves below
+                
+                // We use structured markdown for formatContent to parse
+                // ![type:filename|size](data:...)
+                
+                const sizeStr = (file.size/1024).toFixed(1) + " KB";
                 
                 if (file.type.startsWith('image/')) {
-                    // Image or GIF
-                    content += `\n![${file.name}](${base64Data})`;
+                    content = `![image:${file.name}|${sizeStr}](${base64Data})`;
                 } else if (file.type.startsWith('video/')) {
-                    // Video (MP4, MOV, WEBM, etc.)
-                    // We use a custom pseudo-markdown for video to detect it easily in formatContent
-                    // Syntax: ![video:name](data:video/...)
-                    content += `\n![video:${file.name}](${base64Data})`;
+                    content = `![video:${file.name}|${sizeStr}](${base64Data})`;
                 } else {
-                    // For non-media, we just post a text notice
-                    content += `\n*(Dateivorschau nicht verfügbar)*`;
+                    content = `![file:${file.name}|${sizeStr}](${base64Data})`;
                 }
 
                 try {
