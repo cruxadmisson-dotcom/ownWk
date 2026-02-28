@@ -102,39 +102,42 @@
             align-items: center; 
             gap: 12px;
             background-color: #2b2d31; 
-            border: 1px solid #1e1f22;
-            padding: 12px; 
-            border-radius: 6px; 
-            margin-top: 8px;
-            max-width: 420px;
-            transition: background-color 0.1s;
+            border: 1px solid #232428;
+            padding: 10px 12px; 
+            border-radius: 4px; 
+            margin-top: 6px;
+            max-width: 400px;
+            width: fit-content;
         }
-        .file-attachment:hover {
-            background-color: #303237;
-        }
+        
         .file-icon { 
-            font-size: 32px; 
-            color: #b5bac1; /* Default file icon color */
-            width: 40px;
-            text-align: center;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: #dbdee1;
+            font-size: 24px;
         }
-        /* Custom file type colors */
-        .file-icon.exe { color: #5865f2; }
-        .file-icon.zip, .file-icon.rar { color: #f23f43; }
-        .file-icon.pdf { color: #eb4034; }
-        .file-icon.txt { color: #949ba4; }
+        /* Make generic file icon look like the screenshot (light blue-ish document) */
+        .file-icon i {
+            color: #aeb4e6; /* Light purple/blue tint like in screenshot */
+        }
         
         .file-info { 
             flex: 1; 
             overflow: hidden; 
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            justify-content: center;
         }
+        
         .file-name { 
-            color: #00a8fc; 
+            color: #00a8fc; /* Discord Link Blue */
             font-weight: 500; 
             font-size: 15px;
+            line-height: 1.2;
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
@@ -143,21 +146,17 @@
         .file-name:hover {
             text-decoration: underline;
         }
+        
         .file-size { 
             font-size: 12px; 
-            color: #949ba4; 
+            color: #b5bac1; /* Lighter gray */
+            line-height: 1.2;
+            margin-top: 2px;
         }
+        
+        /* Remove the separate download button on the right, make name clickable */
         .file-download-btn {
-            color: #b5bac1; 
-            cursor: pointer; 
-            padding: 8px; 
-            transition: 0.2s;
-            font-size: 20px;
-        }
-        .file-download-btn:hover { 
-            color: #dbdee1;
-            background-color: rgba(79, 84, 92, 0.32); 
-            border-radius: 4px; 
+            display: none; 
         }
 
         /* User Panel (Bottom Left) */
@@ -611,23 +610,13 @@
                         `;
                     }
                     if (type === 'file') {
-                        // Extract extension for icon styling
-                        const ext = name.split('.').pop().toLowerCase();
-                        let iconClass = 'fa-file';
-                        if (['exe', 'msi', 'bat'].includes(ext)) iconClass = 'fa-file-code exe';
-                        else if (['zip', 'rar', '7z', 'tar'].includes(ext)) iconClass = 'fa-file-zipper zip';
-                        else if (['pdf'].includes(ext)) iconClass = 'fa-file-pdf pdf';
-                        else if (['txt', 'md', 'log'].includes(ext)) iconClass = 'fa-file-lines txt';
-                        else if (['mp3', 'wav', 'ogg'].includes(ext)) iconClass = 'fa-file-audio';
-                        
                         return `
                             <div class="file-attachment">
-                                <div class="file-icon ${ext}"><i class="fa-solid ${iconClass}"></i></div>
+                                <div class="file-icon"><i class="fa-solid fa-file"></i></div>
                                 <div class="file-info">
                                     <a ${downloadAttr} class="file-name" title="${name}">${name}</a>
-                                    <div class="file-size">${size}</div>
+                                    <div class="file-size">${size.replace('.', ',')}</div>
                                 </div>
-                                <a ${downloadAttr} class="file-download-btn" title="Download"><i class="fa-solid fa-download"></i></a>
                             </div>
                         `;
                     }
