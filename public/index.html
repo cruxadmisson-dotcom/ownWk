@@ -701,7 +701,19 @@
                 // We use structured markdown for formatContent to parse
                 // ![type:filename|size](data:...)
                 
-                const sizeStr = (file.size/1024).toFixed(1) + " KB";
+                let sizeStr = "";
+                const sizeInBytes = file.size;
+                
+                if (sizeInBytes < 1024 * 1024) {
+                    // Under 1 MB -> KB
+                    sizeStr = (sizeInBytes / 1024).toFixed(2).replace('.', ',') + " KB";
+                } else if (sizeInBytes < 1024 * 1024 * 1024) {
+                    // Under 1 GB -> MB
+                    sizeStr = (sizeInBytes / (1024 * 1024)).toFixed(2).replace('.', ',') + " MB";
+                } else {
+                    // Over 1 GB -> GB
+                    sizeStr = (sizeInBytes / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',') + " GB";
+                }
                 
                 if (file.type.startsWith('image/')) {
                     content = `![image:${file.name}|${sizeStr}](${base64Data})`;
