@@ -27,6 +27,13 @@
         body { background-color: var(--discord-darkest); color: var(--discord-text); display: flex; height: 100vh; overflow: hidden; }
 
         /* Login Overlay */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
         #login-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: var(--discord-darkest);
@@ -449,12 +456,21 @@
 
         function login() {
             const pass = document.getElementById('login-password').value;
-            if (pass === 'crux1500300636!') {
-                localStorage.setItem('discord_auth', pass);
+            // Trim whitespace to avoid copy-paste errors
+            if (pass.trim() === 'crux1500300636!') {
+                localStorage.setItem('discord_auth', 'crux1500300636!');
                 document.getElementById('login-overlay').style.display = 'none';
                 initApp();
             } else {
-                document.getElementById('login-error').style.display = 'block';
+                const err = document.getElementById('login-error');
+                err.innerText = "Dont try it My Brother Get out Black Ass dawg";
+                err.style.display = 'block';
+                err.style.fontSize = '18px';
+                err.style.fontWeight = 'bold';
+                // Shake animation
+                const box = document.querySelector('.login-box');
+                box.style.animation = 'shake 0.5s';
+                setTimeout(() => box.style.animation = '', 500);
             }
         }
 
