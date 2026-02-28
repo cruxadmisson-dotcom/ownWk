@@ -462,38 +462,27 @@
 
         function login() {
             const input = document.getElementById('login-password');
-            const pass = input.value; // Don't trim yet to check exactly what user types if needed, but we should trim.
+            const pass = input.value;
             
-            console.log("Attempting login..."); // Debug log
-            
-            // Hardcoded check
             if (pass.trim() === 'crux1500300636!') {
-                console.log("Login success");
                 localStorage.setItem('discord_auth', 'crux1500300636!');
-                
-                // Hide overlay
-                const overlay = document.getElementById('login-overlay');
-                overlay.style.display = 'none';
-                
-                // Initialize
+                document.getElementById('login-overlay').style.display = 'none';
                 initApp();
             } else {
-                console.log("Login failed");
                 const err = document.getElementById('login-error');
                 err.innerText = "Dont try it My Brother Get out Black Ass dawg";
                 err.style.display = 'block';
-                err.style.fontSize = '18px';
-                err.style.fontWeight = 'bold';
-                
-                // Clear input
+                err.style.color = '#ff0000'; // Pure red
+                err.style.fontSize = '20px'; // Larger
+                err.style.fontWeight = '900'; // Extra bold
+                err.style.textTransform = 'uppercase'; // Aggressive
+
                 input.value = '';
                 input.focus();
                 
-                // Shake animation
                 const box = document.querySelector('.login-box');
-                // Reset animation to trigger reflow
                 box.style.animation = 'none';
-                box.offsetHeight; /* trigger reflow */
+                box.offsetHeight; 
                 box.style.animation = 'shake 0.5s';
             }
         }
@@ -1460,17 +1449,6 @@
             emojiPicker.style.right = 'auto';
         }
 
-        async function addReaction(id, emoji = null) {
-            // If called from button click without emoji, open picker
-            if (!emoji) {
-                // We need the event to position picker, but `addReaction` signature in HTML is `addReaction('id')`
-                // We can change the onclick in HTML to pass event: `addReaction('id', null, event)`
-                // But easier: just use the global picker logic if I can hook it up.
-                // Let's rely on the updated HTML calling `openReactionPicker` instead of `addReaction` directly for the button.
-                return; 
-            }
-
-            // ... rest of logic ...
     </script>
 </body>
 </html>
